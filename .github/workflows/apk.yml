@@ -1,0 +1,66 @@
+name: Construire l'APK d'essai
+
+# À chaque envoi sur main : APK Android (arm64) + version Windows,
+# publiés dans la Release « essai » (lien fixe à ouvrir depuis le téléphone).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  GODOT_VERSION: 4.3
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Préparer Godot (modèles d'export, clé de débogage)
+        run: |
+          mkdir -v -p ~/.local/share/godot/export_templates/
+          mkdir -v -p ~/.config/
+          [ -d /root/.config/godot ] && cp -r /root/.config/godot ~/.config/ || true
+          [ -d /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable ] && cp -r /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable ~/.local/share/godot/export_templates/ || true
+          keytool -genkeypair -v -keystore /tmp/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Importer le projet
+        run: godot --headless --editor --quit || true
+
+      - name: Export Android
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: /tmp/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        run: |
+          mkdir -p build/android
+          godot --headless --verbose --export-debug "Android" build/android/racines-yggdrasil.apk
+          ls -la build/android
+
+      - name: Export Windows
+        run: |
+          mkdir -p build/windows
+          godot --headless --export-release "Windows" build/windows/RacinesYggdrasil.exe
+          cd build/windows && zip -r ../RacinesYggdrasil-windows.zip .
+
+      - name: Publier dans la Release « essai »
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: essai
+          name: Version d'essai
+          prerelease: true
+          make_latest: false
+          body: |
+            Version d'essai construite automatiquement à chaque envoi.
+            - Téléphone Android : télécharge `racines-yggdrasil.apk` et installe-le (autorise « sources inconnues »).
+            - PC Windows : télécharge le zip, décompresse, lance RacinesYggdrasil.exe.
+          files: |
+            build/android/racines-yggdrasil.apk
+            build/RacinesYggdrasil-windows.zip

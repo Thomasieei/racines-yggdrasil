@@ -1,0 +1,464 @@
+class_name Heros
+extends EntiteCombat
+## Le héros barbare et sa hache à deux mains : déplacement, attaque automatique, 5 compétences, potion, esquive.
+
+signal energie_change(e: float, e_max: float)
+signal refus(id: String, raison: String)
+
+const MODELE := "res://assets/personnages/barbare.glb"
+const CACHES := ["1H_Axe_Offhand", "Barbarian_Round_Shield", "Mug", "1H_Axe"]
+
+## Fiche des compétences (lue aussi par le HUD et les fiches d'objet).
+const COMPETENCES := {
+	"q": {"nom": "Fendoir", "cd": 4.0, "cout": 10.0, "visee": "direction"},
+	"w": {"nom": "Bond du berserker", "cd": 8.0, "cout": 15.0, "visee": "direction"},
+	"e": {"nom": "Ruée runique", "cd": 26.0, "cout": 35.0, "visee": "direction"},
+	"r": {"nom": "Bulle de Freya", "cd": 16.0, "cout": 0.0, "visee": "aucune"},
+	"f": {"nom": "Pas du vent", "cd": 12.0, "cout": 0.0, "visee": "aucune"},
+	"p": {"nom": "Potion de soin", "cd": 10.0, "cout": 0.0, "visee": "aucune"},
+	"d": {"nom": "Esquive", "cd": 1.5, "cout": 15.0, "visee": "direction"},
+}
+
+@export var energie_max := 100.0
+@export var regen_energie := 8.0
+@export var degats_arme := 3.0          ## multiplicateur (niveau de l'arme : Hache du Jarl IV)
+
+var entree := Vector2.ZERO              ## joystick, x = est, y = sud
+var energie := 100.0
+var potions := 3
+var cds := {}
+var action := ""                        ## "", "saut", "incantation", "ruee", "esquive"
+var _action_t := 0.0
+var _action := {}
+var _attaque_t := 0.0
+var _vent_t := 0.0
+var _soin_t := 0.0
+var _vent_particules: CPUParticles3D
+var _visee: Telegraphe
+var _pas_t := 0.0
+
+func _ready() -> void:
+	camp = "joueur"
+	pv_max = 2400.0
+	vitesse = 6.0
+	super._ready()
+	collision_layer = 4     # les monstres ne se bloquent pas sur le héros : séparation douce gérée par eux
+	collision_mask = 1
+	installer_modele(load(MODELE), 1.0, CACHES)
+	for id in COMPETENCES:
+		cds[id] = 0.0
+	var f := CollisionShape3D.new()
+	var c := CapsuleShape3D.new()
+	c.radius = 0.45
+	c.height = 1.8
+	f.shape = c
+	f.position.y = 0.9
+	add_child(f)
+	bulle = Node3D.new()
+	bulle.set_script(load("res://scripts/competences/bulle_freya.gd"))
+	add_child(bulle)
+	jouer("2H_Melee_Idle")
+
+# ---------------- utilitaires ----------------
+
+func ennemis_vivants() -> Array:
+	return get_tree().get_nodes_in_group("monstre").filter(func(e): return not e.est_mort)
+
+func ennemi_proche(portee: float) -> EntiteCombat:
+	var meilleur: EntiteCombat = null
+	var d := portee
+	for e in ennemis_vivants():
+		var l := global_position.distance_to(e.global_position)
+		if l < d:
+			d = l
+			meilleur = e
+	return meilleur
+
+func direction_auto() -> Vector3:
+	var e := ennemi_proche(14.0)
+	return direction_vers(e.global_position) if e else -_avant()
+
+func _avant() -> Vector3:
+	return -global_transform.basis.z * -1.0   # le modèle KayKit regarde vers +z local
+
+func direction_visee() -> Vector3:
+	# pendant un bond ou une ruée la vitesse explose : la caméra ne doit pas anticiper 10 m d'un coup
+	var v := Vector3(velocity.x, 0, velocity.z)
+	return v.limit_length(vitesse) / vitesse if v.length() > 0.3 else Vector3.ZERO
+
+func en_mouvement_rapide() -> bool:
+	return action in ["saut", "ruee", "esquive"]
+
+func _camera_secousse(f: float) -> void:
+	var cam := get_viewport().get_camera_3d()
+	if cam and cam.has_method("secouer"):
+		cam.secouer(f)
+
+func _scene() -> Node:
+	return get_parent()
+
+# ---------------- lancement ----------------
+
+## Appelé par le HUD ou le clavier. `dir` = direction visée (null = automatique vers l'ennemi proche).
+func lancer(id: String, dir = null) -> bool:
+	var c: Dictionary = COMPETENCES[id]
+	var raison := ""
+	if est_mort:
+		raison = "mort"
+	elif etourdi_t > 0.0:
+		raison = "Étourdi"
+	elif action != "":
+		raison = "Impossible maintenant"
+	elif cds[id] > 0.0:
+		raison = "En recharge"
+	elif energie < c["cout"]:
+		raison = "Pas assez d'énergie"
+	elif id == "p" and potions <= 0:
+		raison = "Plus de potions"
+	elif id in ["q", "w", "e"] and ZoneSure.contient(global_position):
+		raison = "Pas d'arme tirée ici"
+	if raison != "":
+		refus.emit(id, raison)
+		Effets.nombre(_scene(), global_position, raison, Color("#CFD6EE"), false, "etat")
+		Sons.jouer("refus", global_position, -10.0)
+		return false
+	var d: Vector3 = dir if dir is Vector3 and dir.length() > 0.1 else direction_auto()
+	if id == "d" and not (dir is Vector3 and dir.length() > 0.1):
+		var m := Vector3(entree.x, 0, entree.y)
+		d = m.normalized() if m.length() > 0.2 else -direction_auto()
+	d.y = 0
+	d = d.normalized()
+	cds[id] = c["cd"]
+	energie -= c["cout"]
+	energie_change.emit(energie, energie_max)
+	match id:
+		"q": _fendoir(d)
+		"w": _bond(d)
+		"e": _ruee_incantation(d)
+		"r": _bulle()
+		"f": _pas_du_vent()
+		"p": _potion()
+		"d": _esquive(d)
+	return true
+
+func montrer_visee(id: String, dir: Vector3) -> void:
+	var formes := {"q": [Telegraphe.Forme.CONE, 3.6, 0.95], "w": [Telegraphe.Forme.LIGNE, 7.0, 2.0], "e": [Telegraphe.Forme.LIGNE, 12.0, 2.6], "d": [Telegraphe.Forme.LIGNE, 4.2, 1.2]}
+	if not formes.has(id):
+		return
+	if _visee == null:
+		var f: Array = formes[id]
+		_visee = Telegraphe.creer(_scene(), f[0], global_position, dir, f[1], f[2], 9999.0, Color(0.5, 0.88, 1.0))
+		_visee.set_process(false)
+	_visee.global_position = global_position + Vector3(0, 0.05, 0)
+	_visee.global_rotation.y = atan2(-dir.x, -dir.z)
+
+func cacher_visee() -> void:
+	if _visee:
+		_visee.queue_free()
+		_visee = null
+
+# ---------------- compétences ----------------
+
+func _fendoir(d: Vector3) -> void:
+	regarder(d)
+	jouer("2H_Melee_Attack_Chop", 0.08, 1.45, 0.55)
+	Sons.jouer("elan", global_position, -2.0)
+	await get_tree().create_timer(0.24).timeout
+	if est_mort:
+		return
+	Effets.taille(_scene(), global_position, d, 3.4, Color(1.0, 0.8, 0.45), "slash_02.png", 0.24, -0.9)
+	var touche := false
+	for e in ennemis_vivants():
+		if Zones.dans_cone(e.global_position, global_position, d, 3.6, 0.95, e.rayon):
+			e.recevoir({"montant": 34.0 * degats_arme, "source": self, "critique": randf() < 0.15, "recul": 0.6})
+			touche = true
+	if touche:
+		Sons.jouer("coup_os", global_position, 0.0)
+		_camera_secousse(0.25)
+		Effets.micro_pause(get_tree(), 0.05)
+
+func _bond(d: Vector3) -> void:
+	var dist := Zones.distance_libre(get_world_3d(), global_position, d, 7.0, [get_rid()])
+	regarder(d)
+	action = "saut"
+	_action_t = 0.0
+	_action = {"dep": global_position, "dir": d, "dist": dist, "duree": 0.55}
+	jouer("Jump_Full_Short", 0.06, 1.35, 0.6)
+	Sons.jouer("tissu", global_position, -4.0)
+
+func _fin_bond() -> void:
+	action = ""
+	Effets.onde(_scene(), global_position, 2.8, Color(1.0, 0.75, 0.4))
+	Effets.poussiere(_scene(), global_position, 12)
+	Sons.jouer("atterrissage", global_position, 0.0)
+	_camera_secousse(0.4)
+	var touche := false
+	for e in ennemis_vivants():
+		if Zones.dans_cercle(e.global_position, global_position, 2.6, e.rayon):
+			e.recevoir({"montant": 26.0 * degats_arme, "source": self, "ralentir": 1.5, "recul": 1.2})
+			touche = true
+	if touche:
+		Sons.jouer("coup_lourd", global_position)
+		Effets.micro_pause(get_tree(), 0.06)
+
+func _ruee_incantation(d: Vector3) -> void:
+	regarder(d)
+	action = "incantation"
+	_action_t = 0.0
+	_action = {"dir": d, "duree": 0.7}
+	_action["tele"] = Telegraphe.creer(_scene(), Telegraphe.Forme.LIGNE, global_position, d, 12.0, 2.6, 0.7, Color(0.35, 0.8, 1.0))
+	jouer("Spellcast_Raise", 0.08, 1.2, 0.75)
+	Sons.jouer("activation", global_position, -4.0, 0.8)
+
+func _ruee_depart() -> void:
+	var d: Vector3 = _action["dir"]
+	var t: Telegraphe = _action["tele"]
+	if is_instance_valid(t):
+		t.terminer()
+	var dist := Zones.distance_libre(get_world_3d(), global_position, d, 12.0, [get_rid()])
+	action = "ruee"
+	_action_t = 0.0
+	_action = {"dep": global_position, "dir": d, "dist": dist, "duree": 0.22, "touches": []}
+	jouer("2H_Melee_Attack_Spin", 0.05, 1.6, 0.5)
+	Sons.jouer("elan", global_position, 2.0, 0.8)
+	_trainee_ruee(global_position, d, dist)
+
+func _trainee_ruee(depart: Vector3, d: Vector3, dist: float) -> void:
+	var m := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(2.4, maxf(dist, 1.0))
+	pm.center_offset = Vector3(0, 0, -maxf(dist, 1.0) * 0.5)
+	m.mesh = pm
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	mat.disable_fog = true   # sinon le brouillard dessine un carré clair autour de l'effet
+	mat.albedo_texture = load("res://assets/vfx/trace_04.png")
+	mat.albedo_color = Color(0.55, 0.9, 1.0, 0.9)
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	m.material_override = mat
+	m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_scene().add_child(m)
+	m.global_position = depart + Vector3(0, 0.15, 0)
+	m.global_rotation.y = atan2(-d.x, -d.z)
+	var tw := m.create_tween()
+	tw.tween_property(mat, "albedo_color:a", 0.0, 0.7).set_delay(0.15)
+	tw.tween_callback(m.queue_free)
+
+func _bulle() -> void:
+	jouer("Block", 0.08, 1.2, 0.4)
+	bulle.activer()
+	Sons.jouer("activation", global_position, -2.0, 1.2)
+
+func _pas_du_vent() -> void:
+	_vent_t = 3.0
+	ralenti_t = 0.0
+	Sons.jouer("tissu", global_position, 0.0, 1.3)
+	if _vent_particules == null:
+		var p := CPUParticles3D.new()
+		p.amount = 24
+		p.lifetime = 0.6
+		var q := QuadMesh.new()
+		q.size = Vector2(0.7, 0.7)
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		m.disable_fog = true   # sinon le brouillard dessine un carré clair autour de l'effet
+		m.albedo_texture = load("res://assets/vfx/twirl_01.png")
+		m.albedo_color = Color(0.6, 1.0, 0.8, 0.6)
+		m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		m.vertex_color_use_as_albedo = true
+		q.material = m
+		p.mesh = q
+		p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+		p.emission_sphere_radius = 0.5
+		p.gravity = Vector3(0, 0.5, 0)
+		p.initial_velocity_min = 0.2
+		p.initial_velocity_max = 0.8
+		p.local_coords = false
+		p.position.y = 0.6
+		var r := Gradient.new()
+		r.set_color(0, Color(1, 1, 1, 0.8))
+		r.set_color(1, Color(1, 1, 1, 0))
+		p.color_ramp = r
+		add_child(p)
+		_vent_particules = p
+	_vent_particules.emitting = true
+
+func _potion() -> void:
+	potions -= 1
+	_soin_t = 4.0
+	jouer("Use_Item", 0.08, 1.4, 0.5)
+	Sons.jouer("potion", global_position)
+	Effets.etincelles(_scene(), global_position + Vector3(0, 0.5, 0), Vector3.UP, Color(0.55, 1.0, 0.6), 18, 2.5, "star_06.png", 0.3)
+
+func _esquive(d: Vector3) -> void:
+	action = "esquive"
+	_action_t = 0.0
+	var dist := Zones.distance_libre(get_world_3d(), global_position, d, 4.2, [get_rid()])
+	_action = {"dep": global_position, "dir": d, "dist": dist, "duree": 0.32}
+	invulnerable_t = 0.3
+	# animation selon la direction par rapport au regard
+	var avant := Vector3(sin(rotation.y), 0, cos(rotation.y))
+	var droite := Vector3(avant.z, 0, -avant.x)
+	var fwd := d.dot(avant)
+	var lat := d.dot(droite)
+	var nom := "Dodge_Forward"
+	if absf(lat) > absf(fwd):
+		nom = "Dodge_Right" if lat > 0 else "Dodge_Left"
+	elif fwd < 0:
+		nom = "Dodge_Backward"
+	jouer(nom, 0.05, 1.5, 0.35)
+	Effets.poussiere(_scene(), global_position, 6)
+	Sons.jouer("tissu", global_position, -2.0, 1.2)
+
+func interrompre() -> void:
+	if action == "incantation":
+		var t = _action.get("tele")
+		if is_instance_valid(t):
+			t.terminer(true)
+		action = ""
+		Effets.nombre(_scene(), global_position, "Interrompu", Color("#FFB37A"), false, "etat")
+
+func _reaction_coup(d: Dictionary) -> void:
+	Sons.jouer("coup_recu", global_position, -2.0)
+	_camera_secousse(0.2 if not d.get("lourd", false) else 0.45)
+	if action == "" and verrou_anim <= 0.0:
+		jouer("Hit_A", 0.05, 1.6, 0.22)
+
+func _mourir() -> void:
+	super._mourir()
+	cacher_visee()
+	jouer("Death_A", 0.1, 1.0, 99.0)
+
+# ---------------- boucle ----------------
+
+func _physics_process(delta: float) -> void:
+	_process_etats(delta)
+	for id in cds:
+		cds[id] = maxf(0.0, cds[id] - delta)
+	if est_mort:
+		velocity = Vector3.ZERO
+		appliquer_physique(delta)
+		return
+	energie = minf(energie_max, energie + regen_energie * delta)
+	energie_change.emit(energie, energie_max)
+	if _soin_t > 0.0:
+		_soin_t -= delta
+		soigner(pv_max * 0.3 / 4.0 * delta)
+	if _vent_t > 0.0:
+		_vent_t -= delta
+		if _vent_t <= 0.0 and _vent_particules:
+			_vent_particules.emitting = false
+
+	match action:
+		"saut":
+			_action_t += delta
+			var k := clampf(_action_t / _action["duree"], 0.0, 1.0)
+			var cible: Vector3 = _action["dep"] + _action["dir"] * _action["dist"] * k
+			velocity = (cible - global_position) / maxf(delta, 0.001)
+			velocity.y = 0
+			move_and_slide()
+			if modele:
+				modele.position.y = sin(k * PI) * 1.6
+			if k >= 1.0:
+				if modele:
+					modele.position.y = 0.0
+				_fin_bond()
+			return
+		"incantation":
+			_action_t += delta
+			velocity = Vector3.ZERO
+			if _action_t >= _action["duree"]:
+				_ruee_depart()
+			return
+		"ruee":
+			_action_t += delta
+			var k2 := clampf(_action_t / _action["duree"], 0.0, 1.0)
+			var cible2: Vector3 = _action["dep"] + _action["dir"] * _action["dist"] * k2
+			velocity = (cible2 - global_position) / maxf(delta, 0.001)
+			velocity.y = 0
+			move_and_slide()
+			var dep: Vector3 = _action["dep"]
+			for e in ennemis_vivants():
+				if e in _action["touches"]:
+					continue
+				if Zones.dans_ligne(e.global_position, dep, _action["dir"], _action["dist"] * k2 + 0.5, 2.6, e.rayon):
+					_action["touches"].append(e)
+					e.recevoir({"montant": 78.0 * degats_arme, "source": self, "etourdir": 1.4, "critique": randf() < 0.25, "lourd": true})
+					Sons.jouer("cloche", e.global_position, -2.0)
+					Effets.flash_lumiere(_scene(), e.global_position, Color(0.6, 0.9, 1.0), 3.0, 6.0)
+			if k2 >= 1.0:
+				action = ""
+				velocity = Vector3.ZERO
+				Effets.poussiere(_scene(), global_position, 10)
+				if not _action["touches"].is_empty():
+					_camera_secousse(0.5)
+					Effets.micro_pause(get_tree(), 0.07)
+			return
+		"esquive":
+			_action_t += delta
+			var k3 := clampf(_action_t / _action["duree"], 0.0, 1.0)
+			var e3 := 1.0 - pow(1.0 - k3, 2.0)
+			var cible3: Vector3 = _action["dep"] + _action["dir"] * _action["dist"] * e3
+			velocity = (cible3 - global_position) / maxf(delta, 0.001)
+			velocity.y = 0
+			move_and_slide()
+			if k3 >= 1.0:
+				action = ""
+				velocity = Vector3.ZERO
+			return
+
+	if etourdi_t > 0.0:
+		velocity = velocity.move_toward(Vector3.ZERO, 30.0 * delta)
+		appliquer_physique(delta)
+		return
+
+	# déplacement
+	var clavier := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+	var e_in := entree + clavier
+	if e_in.length() > 1.0:
+		e_in = e_in.normalized()
+	var v_max := vitesse * facteur_vitesse() * (1.6 if _vent_t > 0.0 else 1.0)
+	var voulu := Vector3(e_in.x, 0, e_in.y) * v_max
+	var h := Vector3(velocity.x, 0, velocity.z).move_toward(voulu, 45.0 * delta)
+	velocity.x = h.x
+	velocity.z = h.z
+	appliquer_physique(delta)
+	var bouge := h.length() > 0.4
+	if bouge:
+		regarder(h, delta)
+		_pas_t -= delta * h.length() / vitesse
+		if _pas_t <= 0.0:
+			_pas_t = 0.34
+			Sons.jouer("pas", global_position, -18.0)
+
+	# attaque automatique sur l'ennemi proche
+	_attaque_t -= delta
+	var cible_auto := ennemi_proche(3.0)
+	if cible_auto and _attaque_t <= 0.0 and verrou_anim <= 0.0:
+		_attaque_t = 0.95
+		var dir_a := direction_vers(cible_auto.global_position)
+		if not bouge:
+			regarder(dir_a)
+		jouer("2H_Melee_Attack_Slice", 0.06, 1.7, 0.4)
+		Sons.jouer("elan", global_position, -6.0, 1.15)
+		_frappe_auto(cible_auto, dir_a)
+
+	if verrou_anim <= 0.0:
+		if bouge:
+			jouer("Running_A", 0.12, clampf(h.length() / vitesse, 0.7, 1.2))
+		else:
+			jouer("2H_Melee_Idle", 0.15)
+
+func _frappe_auto(cible: EntiteCombat, d: Vector3) -> void:
+	await get_tree().create_timer(0.17).timeout
+	if est_mort or not is_instance_valid(cible) or cible.est_mort:
+		return
+	Effets.taille(_scene(), global_position, d, 2.6, Color(1.0, 0.72, 0.4, 0.8), "slash_03.png", 0.18, -0.5)
+	if global_position.distance_to(cible.global_position) <= 3.4:
+		cible.recevoir({"montant": 14.0 * degats_arme, "source": self, "critique": randf() < 0.1})
+		Sons.jouer("coup_os", cible.global_position, -4.0)

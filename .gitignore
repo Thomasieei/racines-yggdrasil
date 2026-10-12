@@ -1,0 +1,9 @@
+# Cache de Godot (regénéré à l'ouverture du projet)
+.godot/
+# Exports
+build/
+*.apk
+*.aab
+# Clés de signature : jamais dans le dépôt
+*.keystore
+*.jks
