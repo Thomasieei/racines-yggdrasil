@@ -46,6 +46,8 @@ func _ready() -> void:
 	if sd and sd.has_method("preparer"):
 		await sd.preparer()
 	chargement.disparaitre()
+	if "--test-progression" in OS.get_cmdline_user_args():
+		_test_progression()
 	if "--test-objets" in OS.get_cmdline_user_args():
 		_test_objets()
 
@@ -135,6 +137,12 @@ func _construire() -> void:
 		sc.name = "Scenario"
 		add_child(sc)
 		sc.demarrer(self, joueur, hud, "--sans-intro" in args or sans_intro_suivante)
+	if hud:
+		var suivi := Node.new()
+		suivi.set_script(load("res://scripts/progression/suivi.gd"))
+		suivi.name = "Suivi"
+		add_child(suivi)
+		suivi.lancer(joueur, carte)
 	joueur.mort.connect(func(_e): _apres_la_mort())
 	_fondu_entree()
 
@@ -200,6 +208,7 @@ func _physics_process(_d: float) -> void:
 	if carte == "surface" and joueur and not joueur.est_mort and carte_suivante != "crypte_en_cours":
 		if joueur.global_position.distance_to(CarteSurface.PORTAIL + Vector3(0, 0, 1.6)) < 2.6:
 			carte_suivante = "crypte_en_cours"
+			Jeu.evenement("portail")
 			Sons.jouer("activation", joueur.global_position, 0.0, 0.7)
 			changer_carte("crypte")
 
@@ -405,6 +414,52 @@ func _test_objets() -> void:
 	hud.sac_ui.fermer_sac()
 	await get_tree().create_timer(1.5).timeout
 	await _cap("acolyte")
+	get_tree().quit()
+
+func _test_progression() -> void:
+	var pr := Profil.p()
+	await get_tree().create_timer(1.0).timeout
+	for k in ["tues", "tues", "coffres"]:
+		pr.compter(k, 10)
+	pr.compter("metres", 600)
+	pr.points_gagnes += 12
+	for id in ["morsure", "morsure", "morsure", "croc", "croc", "ecorce", "ecorce", "memoire", "vent", "hurlement", "repos"]:
+		pr.investir(id)
+	await get_tree().create_timer(3.5).timeout
+	hud.talents_ui.ouvrir()
+	hud.talents_ui._choix = "hurlement"
+	hud.talents_ui._rafraichir()
+	await get_tree().create_timer(1.2).timeout
+	await _cap("arbre")
+	hud.talents_ui.fermer()
+	hud.codex_ui.ouvrir()
+	await get_tree().create_timer(0.5).timeout
+	await _cap("codex")
+	hud.codex_ui._cat = "Secrets"
+	hud.codex_ui._rafraichir()
+	await get_tree().create_timer(0.5).timeout
+	await _cap("codex_secrets")
+	hud.codex_ui.fermer()
+	var rel: Array = []
+	for r in ["commun", "rare", "epique", "legendaire", "mythique"]:
+		var o := Objets.creer("relique", r)
+		joueur.sac.ajouter(o)
+		rel.append(o)
+	for o in rel.slice(0, 4):
+		joueur.sac.porter_relique(o)
+	printerr("TEST pv_max=", joueur.pv_max, " sorts=", joueur.stat("sorts"), " recharge=", joueur.stat("recharge"), " endurance=", joueur.stat("endurance"))
+	hud.sac_ui.ouvrir_sac()
+	hud.sac_ui._choix = rel[4]
+	hud.sac_ui._rafraichir()
+	await get_tree().create_timer(0.5).timeout
+	await _cap("sac_reliques")
+	hud.sac_ui.fermer_sac()
+	hud.celebrer_relique(rel[3])
+	await get_tree().create_timer(0.9).timeout
+	await _cap("relique")
+	hud.annoncer_realisation(Codex.LISTE[0])
+	await get_tree().create_timer(0.6).timeout
+	await _cap("realisation")
 	get_tree().quit()
 
 func _cap(nom: String) -> void:

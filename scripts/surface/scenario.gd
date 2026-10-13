@@ -217,10 +217,14 @@ func _arrivee_bourg() -> void:
 	recit.dire("Freya", "freya", [
 		"Te voilà au Bourg de Skjold. Ici, tu es en sécurité : les gardes tranchent quiconque tire son arme dans l'enceinte.",
 		"Halvard achète ce que tu remontes, Ingrid forge et répare. Garde toujours de quoi te rééquiper : le donjon ne rend jamais ce qu'il prend.",
+		"Tout ce que tu accomplis là-dessous s'inscrit dans ton Codex. Chaque exploit te donne des points à planter dans l'Arbre des Racines : ce que tu y fais pousser, toi seul le décides.",
+		"Et cherche des reliques. Même la plus modeste te rendra plus fort, et celles qui brillent orange ou rouge… on se bat pour elles.",
+		"Une dernière chose. On dit que les dragons d'autrefois ont laissé leurs runes à qui regarde là où personne ne regarde. Je n'en dirai pas plus : certaines voies ne s'enseignent pas.",
 		"Quand tu seras prêt, le Portail d'Yggdrasil t'attend au nord du Bourg.",
 	])
 	await recit.dialogue_fini
 	_bloquer(false)
+	Jeu.notifier("Codex et Arbre des Racines : en haut à droite.", Color("#FFD36B"), "res://assets/icones_sorts/codex.svg")
 	etape = 5
 	recit.quete("Le Portail d'Yggdrasil", "Au nord du Bourg", CarteSurface.PORTAIL)
 	guide.viser(CarteSurface.PORTAIL + Vector3(0, 0, 6))

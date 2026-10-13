@@ -11,6 +11,43 @@ var objets: Array = []
 var or_ := 0
 var arme: Dictionary = {}       ## arme équipée (vide = hache du Jarl de départ)
 var acolyte: Dictionary = {}    ## dragon équipé
+var reliques: Array = [{}, {}, {}, {}, {}, {}]   ## six emplacements de reliques
+
+func reliques_portees() -> int:
+	return reliques.filter(func(r): return not r.is_empty()).size()
+
+## Somme des bonus des reliques portées pour un effet.
+func bonus_relique(stat: String) -> float:
+	var v := 0.0
+	for r in reliques:
+		if not r.is_empty() and r.get("stat", "") == stat:
+			v += r["bonus"]
+	return v
+
+## Porte une relique du sac (premier emplacement libre, sinon à la place de la moins précieuse).
+func porter_relique(o: Dictionary) -> void:
+	var i := -1
+	for k in reliques.size():
+		if reliques[k].is_empty():
+			i = k
+			break
+	if i < 0:
+		i = 0
+		for k in reliques.size():
+			if reliques[k]["valeur"] < reliques[i]["valeur"]:
+				i = k
+		objets.append(reliques[i])
+	objets.erase(o)
+	reliques[i] = o
+	change.emit()
+
+func retirer_relique(i: int) -> bool:
+	if reliques[i].is_empty() or objets.size() >= CAPACITE:
+		return false
+	objets.append(reliques[i])
+	reliques[i] = {}
+	change.emit()
+	return true
 
 func ajouter(o: Dictionary) -> bool:
 	# empile avec un objet identique (même modèle, même rareté)
@@ -49,7 +86,7 @@ func valeur() -> int:
 	var v := or_
 	for x in objets:
 		v += x["valeur"] * x["qte"]
-	for e in [arme, acolyte]:
+	for e in [arme, acolyte] + reliques:
 		if not e.is_empty():
 			v += e["valeur"]
 	return v
@@ -61,9 +98,10 @@ func ajouter_or(n: int) -> void:
 ## Tout ce que le sac contient (objets + équipement), pour le corps laissé à la mort.
 func tout_vider() -> Dictionary:
 	var butin := {"or": or_, "objets": objets.duplicate()}
-	for e in [arme, acolyte]:
+	for e in [arme, acolyte] + reliques:
 		if not e.is_empty():
 			butin["objets"].append(e)
+	reliques = [{}, {}, {}, {}, {}, {}]
 	objets.clear()
 	or_ = 0
 	arme = {}

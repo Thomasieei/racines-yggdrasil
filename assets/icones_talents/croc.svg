@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 128 128"><defs>
+<linearGradient id="or" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF1C4"/><stop offset="0.55" stop-color="#F4C35A"/><stop offset="1" stop-color="#C77A22"/></linearGradient>
+<linearGradient id="givre" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F2FCFF"/><stop offset="0.55" stop-color="#7FE3FF"/><stop offset="1" stop-color="#2E8FD0"/></linearGradient>
+<linearGradient id="vert" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F0FFF6"/><stop offset="0.55" stop-color="#9CE07A"/><stop offset="1" stop-color="#3C8A3A"/></linearGradient>
+<linearGradient id="rouge" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFB3A8"/><stop offset="0.5" stop-color="#E5383B"/><stop offset="1" stop-color="#8E1520"/></linearGradient>
+<linearGradient id="acier" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#AFC0D6"/></linearGradient>
+<linearGradient id="bois" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D9A86A"/><stop offset="1" stop-color="#7A4A22"/></linearGradient>
+<linearGradient id="nuit" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9AA6C8"/><stop offset="1" stop-color="#2C3150"/></linearGradient>
+</defs>
+<path d="M50 14 Q86 30 78 74 Q72 100 56 116 Q60 88 52 64 Q44 40 50 14 Z" fill="none" stroke="#1A120A" stroke-width="14" stroke-linejoin="round" stroke-linecap="round"/><path d="M50 14 Q86 30 78 74 Q72 100 56 116 Q60 88 52 64 Q44 40 50 14 Z" fill="url(#acier)" stroke="#1A120A" stroke-width="6" stroke-linejoin="round" stroke-linecap="round" /><path d="M58 28 Q72 44 68 66" fill="none" stroke="#FFF8E2" stroke-width="4" stroke-linecap="round" opacity="0.85"/><path d="M96 20 L100 32 L112 36 L100 40 L96 52 L92 40 L80 36 L92 32 Z" fill="none" stroke="#1A120A" stroke-width="12" stroke-linejoin="round" stroke-linecap="round"/><path d="M96 20 L100 32 L112 36 L100 40 L96 52 L92 40 L80 36 L92 32 Z" fill="url(#or)" stroke="#1A120A" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" />
+</svg>

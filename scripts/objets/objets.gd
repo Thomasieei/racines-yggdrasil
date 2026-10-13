@@ -32,7 +32,18 @@ const MODELES := {
 	"arbalete": {"nom": "Arbalète", "type": "arme", "icone": ICO + "045_crossbow_1handed.png", "valeur": 60},
 	"oeuf": {"nom": "Œuf de dragon", "type": "oeuf", "valeur": 80},
 	"dragon": {"nom": "Bébé dragon", "type": "dragon", "valeur": 60},
+	"relique": {"nom": "Relique", "type": "relique", "valeur": 120},
 }
+
+## Reliques : six emplacements, un effet chacune. Vert ≈ +1,6 %, bleu +3 %, violet +6 à 8 %,
+## orange +20 à 24 %, rouge +30 à 35 %. Une relique orange ou rouge change une partie.
+const RELIQUES := {
+	"sorts": {"nom": "Œil de Thor", "effet": "puissance des compétences"},
+	"endurance": {"nom": "Cœur de chêne", "effet": "points de vie"},
+	"energie": {"nom": "Larme de Freya", "effet": "énergie et régénération"},
+	"recharge": {"nom": "Sablier des Nornes", "effet": "vitesse de recharge"},
+}
+const BONUS_RELIQUE := {"commun": [1.6, 1.6], "rare": [3.0, 3.0], "epique": [6.0, 8.0], "legendaire": [20.0, 24.0], "mythique": [30.0, 35.0]}
 
 static var _uid := 0
 
@@ -51,7 +62,21 @@ static func creer(id: String, rarete := "commun", qte := 1) -> Dictionary:
 			o["nom"] = "Œuf de dragon " + NOMS_RARETE[rarete].to_lower()
 		"dragon":
 			o["icone"] = ICO2 + "dragon_" + rarete + ".png"
+		"relique":
+			var st: String = RELIQUES.keys()[randi() % RELIQUES.size()]
+			var b: Array = BONUS_RELIQUE[rarete]
+			var pct: float = snappedf(randf_range(b[0], b[1]), 0.1)
+			o["stat"] = st
+			o["bonus"] = pct / 100.0
+			o["nom"] = RELIQUES[st]["nom"]
+			o["icone"] = "res://assets/icones_reliques/%s_%s.svg" % [st, rarete]
 	return o
+
+## « +3 % de points de vie », « +6,4 % de puissance des compétences »…
+static func texte_relique(o: Dictionary) -> String:
+	var v: float = o.get("bonus", 0.0) * 100.0
+	var t := ("%.1f" % v).replace(".", ",").trim_suffix(",0")
+	return "+%s %% de %s" % [t, RELIQUES[o["stat"]]["effet"]]
 
 ## Bébé dragon tiré d'un œuf. La rareté de l'œuf fixe les chances ; au-delà du bleu c'est extrêmement rare.
 ## Puissance de 1 à 5 étoiles, niveau 1, xp 0. Un dragon faible se revend mal, un très fort vaut une fortune.
@@ -133,6 +158,9 @@ static func contenu_coffre(rarete: String) -> Dictionary:
 	# œuf de dragon : rare, plus probable dans les grands coffres
 	if randf() < [0.01, 0.03, 0.07, 0.15, 0.35][niv]:
 		objets.append(creer("oeuf", tirer_rarete([0.6, 0.3, 0.08, 0.018, 0.002])))
+	# relique : la vraie récompense des grands coffres
+	if randf() < [0.05, 0.12, 0.28, 0.55, 0.9][niv]:
+		objets.append(creer("relique", tirer_rarete([[0.75, 0.22, 0.03, 0, 0], [0.5, 0.38, 0.11, 0.01, 0], [0.2, 0.45, 0.3, 0.05, 0], [0.05, 0.35, 0.42, 0.16, 0.02], [0, 0.15, 0.45, 0.32, 0.08]][niv])))
 	var or_ := int(randi_range(15, 40) * (1.0 + niv * 1.8))
 	return {"or": or_, "objets": objets}
 
@@ -144,6 +172,8 @@ static func butin_monstre(type: String) -> Dictionary:
 		objets.append(creer(ARMES[randi() % ARMES.size()], tirer_rarete([0, 0.3, 0.45, 0.2, 0.05])))
 		if randf() < 0.18:
 			objets.append(creer("oeuf", tirer_rarete([0.35, 0.4, 0.18, 0.06, 0.01])))
+		if randf() < 0.3:
+			objets.append(creer("relique", tirer_rarete([0.2, 0.45, 0.28, 0.06, 0.01])))
 	else:
 		if randf() < 0.25:
 			objets.append(creer("tissu", "commun", randi_range(1, 2)))
@@ -151,6 +181,8 @@ static func butin_monstre(type: String) -> Dictionary:
 			objets.append(creer(ARMES[randi() % ARMES.size()], tirer_rarete([0.75, 0.22, 0.03, 0, 0])))
 		if randf() < 0.004:
 			objets.append(creer("oeuf", tirer_rarete([0.7, 0.25, 0.045, 0.004, 0.001])))
+		if randf() < 0.006:
+			objets.append(creer("relique", tirer_rarete([0.7, 0.25, 0.045, 0.004, 0.001])))
 	return {"or": randi_range(2, 9) * (12 if elite else 1), "objets": objets}
 
 static func couleur(o: Dictionary) -> Color:

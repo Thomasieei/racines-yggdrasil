@@ -156,6 +156,18 @@ func _rafraichir() -> void:
 	plein.size = Vector2(134.0 * m["xp"] / besoin, 8)
 	_equip.add_child(plein)
 	texte("%d / %d XP" % [m["xp"], besoin], 11, ENCRE2, Vector2(46, 202), _equip, false)
+	# reliques : six emplacements
+	texte("Reliques  %d / 6" % sac.reliques_portees(), 15, ENCRE, Vector2(0, 226), _equip, false)
+	for i in 6:
+		_case(sac.reliques[i], Vector2((i % 3) * 62, 250 + (i / 3) * 62), 56, _equip, "·")
+	var effets := []
+	for st in Objets.RELIQUES:
+		var b := sac.bonus_relique(st)
+		if b > 0.0:
+			effets.append(("+%.1f %% " % (b * 100.0)).replace(".", ",").replace(",0 ", " ") + Objets.RELIQUES[st]["effet"])
+	var lab := texte("\n".join(effets) if not effets.is_empty() else "Aucune relique portée.", 10, Color("#5A3A10"), Vector2(0, 372), _equip, false, 186)
+	lab.add_theme_constant_override("line_spacing", -3)
+	lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	# grille du sac
 	var t := 64.0
 	var g := 6.0
@@ -184,7 +196,7 @@ func _remplir_fiche() -> void:
 	_case(o, Vector2(16, 16), 84, f)
 	var nom := texte(o["nom"], 18, c.darkened(0.3), Vector2(110, 18), f, false, 240)
 	nom.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	texte(Objets.NOMS_RARETE[o["rarete"]] + " · " + {"ressource": "ressource", "arme": "arme", "potion": "consommable", "oeuf": "œuf", "dragon": "acolyte"}[o["type"]], 13, ENCRE2, Vector2(110, 62), f, false)
+	texte(Objets.NOMS_RARETE[o["rarete"]] + " · " + {"ressource": "ressource", "arme": "arme", "potion": "consommable", "oeuf": "œuf", "dragon": "acolyte", "relique": "relique"}[o["type"]], 13, ENCRE2, Vector2(110, 62), f, false)
 	texte("Valeur : %s or%s" % [_milliers(o["valeur"]), (" (×%d)" % o["qte"]) if o["qte"] > 1 else ""], 13, Color("#7A4F0C"), Vector2(110, 80), f, false)
 	var y := 116.0
 	var lignes: Array = []
@@ -200,6 +212,8 @@ func _remplir_fiche() -> void:
 			lignes = ["Rend 30 % de la vie en 4 s.", "Aussi utilisable depuis la roue des sorts."]
 		"ressource":
 			lignes = ["Se vend au marchand, sert à la forge."]
+		"relique":
+			lignes = [Objets.texte_relique(o), "Une relique portée agit en permanence.", "Six au plus. Perdue avec le sac si tu meurs."]
 	for l in lignes:
 		var lab := texte(l, 14, ENCRE, Vector2(20, y), f, false, 330)
 		lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -210,6 +224,12 @@ func _remplir_fiche() -> void:
 	var actions: Array = []
 	var dans_sac := heros.sac.objets.has(o)
 	match o["type"]:
+		"relique":
+			var porte: int = heros.sac.reliques.find(o)
+			if porte >= 0:
+				actions.append(["Retirer", func(): heros.sac.retirer_relique(porte); _rafraichir()])
+			else:
+				actions.append(["Porter", func(): heros.sac.porter_relique(o); Profil.p().maximum("reliques_portees", heros.sac.reliques_portees()); _rafraichir()])
 		"oeuf":
 			actions.append(["Faire éclore", func(): _eclore(o)])
 		"dragon":
@@ -240,6 +260,7 @@ func _vendre(o: Dictionary) -> void:
 func _eclore(o: Dictionary) -> void:
 	heros.sac.retirer(o)
 	var d := Objets.eclore(o)
+	Profil.p().compter("eclosions")
 	heros.sac.ajouter(d)
 	_choix = d
 	var e := CanvasLayer.new()

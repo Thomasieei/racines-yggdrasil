@@ -89,6 +89,7 @@ func xp_acolyte(n: int) -> void:
 			Jeu.notifier("%s passe niveau %d !" % [d["nom"], d["niveau"]], Objets.COULEURS[d["rarete"]])
 
 func gagner_xp_mine(n: int) -> void:
+	n = int(round(n * (1.0 + stat("fortune"))))
 	metier_mine["xp"] += n
 	var besoin: int = 40 + metier_mine["niveau"] * 30
 	if self == Jeu.joueur:
@@ -115,7 +116,7 @@ var _pas_t := 0.0
 
 func _ready() -> void:
 	camp = "joueur"
-	pv_max = 2400.0
+	pv_max = PV_BASE
 	vitesse = 6.0
 	super._ready()
 	collision_layer = 4     # les monstres ne se bloquent pas sur le héros : séparation douce gérée par eux
@@ -123,6 +124,10 @@ func _ready() -> void:
 	installer_modele(load(classe_modele), 1.0, CACHES_CHEVALIER if classe_modele == CHEVALIER else CACHES)
 	sac.ajouter(Objets.creer("potion", "commun", 3))
 	sac.change.connect(_maj_arme)
+	sac.change.connect(_maj_stats)
+	if not ia:
+		Profil.p().change.connect(_maj_stats)
+	_maj_stats()
 	for id in COMPETENCES:
 		cds[id] = 0.0
 	var f := CollisionShape3D.new()
@@ -181,6 +186,41 @@ func disponible() -> bool:
 func interagir(h: Heros) -> void:
 	h.declarer_hostile(self)
 	Jeu.notifier("Tu attaques %s. Celui qui tombe perd tout son sac." % nom_joueur, Color("#FFB37A"))
+
+# ---------------- statistiques (talents + reliques) ----------------
+
+const PV_BASE := 2400.0
+const ENERGIE_BASE := 100.0
+var _t_sans_coup := 99.0
+var _rempart_t := 0.0
+
+## Bonus total d'une statistique : reliques portées, plus l'Arbre des Racines pour le joueur.
+func stat(nom: String) -> float:
+	var v := sac.bonus_relique(nom)
+	if not ia:
+		v += Profil.p().stat(nom)
+	return v
+
+func _maj_stats() -> void:
+	var ratio := pv / pv_max if pv_max > 0.0 else 1.0
+	pv_max = roundf(PV_BASE * (1.0 + stat("endurance")))
+	pv = clampf(ratio * pv_max, 1.0 if not est_mort else 0.0, pv_max)
+	pv_change.emit(pv, pv_max)
+	energie_max = ENERGIE_BASE * (1.0 + stat("energie") * 0.5)
+
+## Dégâts d'une compétence (ou de l'attaque auto) sur une cible, avec les bonus.
+func _degats(base: float, e: Node, auto := false) -> float:
+	var m := base * degats_arme * (1.0 + (stat("auto") if auto else stat("sorts")))
+	if e.pv < e.pv_max * 0.3:
+		m *= 1.0 + stat("achever")
+	return m
+
+## Tire un critique ; Sang de Fenrir soigne à chaque critique.
+func _crit(chance: float) -> bool:
+	var c := randf() < chance + stat("critique")
+	if c and stat("fenrir") > 0.0:
+		soigner(pv_max * 0.02)
+	return c
 
 func _micro_pause(t: float) -> void:
 	if not ia:
@@ -247,6 +287,16 @@ func _scene() -> Node:
 
 # ---------------- lancement ----------------
 
+func _cout(id: String) -> float:
+	if id == "d" and stat("muninn") > 0.0:
+		return 0.0
+	return COMPETENCES[id]["cout"]
+
+func _recharge(id: String) -> float:
+	if id == "d" and stat("muninn") > 0.0:
+		return 0.8
+	return COMPETENCES[id]["cd"] * maxf(0.4, 1.0 - stat("recharge"))
+
 ## Appelé par le HUD ou le clavier. `dir` = direction visée (null = automatique vers l'ennemi proche).
 func lancer(id: String, dir = null) -> bool:
 	var c: Dictionary = COMPETENCES[id]
@@ -259,7 +309,7 @@ func lancer(id: String, dir = null) -> bool:
 		raison = "Impossible maintenant"
 	elif cds[id] > 0.0:
 		raison = "En recharge"
-	elif energie < c["cout"]:
+	elif energie < _cout(id):
 		raison = "Pas assez d'énergie"
 	elif id == "p" and potions <= 0:
 		raison = "Plus de potions"
@@ -278,8 +328,8 @@ func lancer(id: String, dir = null) -> bool:
 		d = m.normalized() if m.length() > 0.2 else -direction_auto()
 	d.y = 0
 	d = d.normalized()
-	cds[id] = c["cd"]
-	energie -= c["cout"]
+	cds[id] = _recharge(id)
+	energie -= _cout(id)
 	energie_change.emit(energie, energie_max)
 	match id:
 		"q": _fendoir(d)
@@ -320,7 +370,7 @@ func _fendoir(d: Vector3) -> void:
 	var touche := false
 	for e in cibles_touchables():
 		if Zones.dans_cone(e.global_position, global_position, d, 3.6, 0.95, e.rayon):
-			e.recevoir({"montant": 34.0 * degats_arme, "source": self, "critique": randf() < 0.15, "recul": 0.6})
+			e.recevoir({"montant": _degats(34.0, e), "source": self, "critique": _crit(0.15), "recul": 0.6})
 			touche = true
 	if touche:
 		Sons.jouer("coup_os", global_position, 0.0)
@@ -345,7 +395,7 @@ func _fin_bond() -> void:
 	var touche := false
 	for e in cibles_touchables():
 		if Zones.dans_cercle(e.global_position, global_position, 2.6, e.rayon):
-			e.recevoir({"montant": 26.0 * degats_arme, "source": self, "ralentir": 1.5, "recul": 1.2})
+			e.recevoir({"montant": _degats(26.0, e), "source": self, "critique": _crit(0.05), "ralentir": 1.5, "recul": 1.2})
 			touche = true
 	if touche:
 		Sons.jouer("coup_lourd", global_position)
@@ -489,6 +539,24 @@ func recevoir(d: Dictionary) -> void:
 			d["montant"] = d.get("montant", 0.0) * MULT_JCJ
 	if action == "canal" and d.get("montant", 0.0) > 0.0 and invulnerable_t <= 0.0 and not est_mort:
 		_fin_canal(false)
+	if d.get("montant", 0.0) > 0.0 and invulnerable_t <= 0.0 and not est_mort:
+		_t_sans_coup = 0.0
+		var arm := minf(0.5, stat("armure"))
+		var m: float = d["montant"] * (1.0 - arm)
+		# Dernier rempart : un coup mortel laisse à 1 PV, une fois toutes les 90 s
+		if m >= pv and stat("rempart") > 0.0 and _rempart_t <= 0.0:
+			m = pv - 1.0
+			_rempart_t = 90.0
+			d = d.duplicate()
+			d["montant"] = m
+			super.recevoir(d)
+			invulnerable_t = 1.5
+			Effets.onde(_scene(), global_position, 3.5, Color(0.6, 1.0, 0.5))
+			Effets.nombre(_scene(), global_position, "Dernier rempart !", Color("#B8FF9A"), true, "etat")
+			return
+		if arm > 0.0:
+			d = d.duplicate()
+			d["montant"] = m
 	super.recevoir(d)
 
 func _reaction_coup(d: Dictionary) -> void:
@@ -508,6 +576,8 @@ func _mourir() -> void:
 		acolyte_noeud.queue_free()
 	if tueur is Heros and not tueur.est_mort:
 		butin = tueur.ramasser(butin, "la dépouille de " + nom_joueur)
+		if tueur == Jeu.joueur:
+			Jeu.evenement("jcj", {"nom": nom_joueur})
 	if not butin["objets"].is_empty() or butin["or"] > 0:
 		Depouille.creer(_scene(), global_position, butin, nom_joueur)
 
@@ -515,7 +585,10 @@ func _mourir() -> void:
 func ramasser(butin: Dictionary, origine := "") -> Dictionary:
 	var reste: Array = []
 	if butin["or"] > 0:
-		sac.ajouter_or(butin["or"])
+		var gain := int(round(butin["or"] * (1.0 + stat("fortune"))))
+		sac.ajouter_or(gain)
+		butin = butin.duplicate()
+		butin["or"] = gain
 	var pris: Array = []
 	for o in butin["objets"]:
 		if sac.ajouter(o):
@@ -537,11 +610,17 @@ func _physics_process(delta: float) -> void:
 		velocity = Vector3.ZERO
 		appliquer_physique(delta)
 		return
-	energie = minf(energie_max, energie + regen_energie * delta)
+	energie = minf(energie_max, energie + regen_energie * (1.0 + stat("energie")) * delta)
+	_rempart_t = maxf(0.0, _rempart_t - delta)
+	_t_sans_coup += delta
+	if _t_sans_coup > 6.0 and pv < pv_max:
+		var rg := stat("regen")
+		if rg > 0.0:
+			soigner(pv_max * rg * delta)
 	energie_change.emit(energie, energie_max)
 	if _soin_t > 0.0:
 		_soin_t -= delta
-		soigner(pv_max * 0.3 / 4.0 * delta)
+		soigner(pv_max * 0.3 / 4.0 * (1.0 + stat("soin")) * delta)
 	if _vent_t > 0.0:
 		_vent_t -= delta
 		if _vent_t <= 0.0 and _vent_particules:
@@ -591,7 +670,7 @@ func _physics_process(delta: float) -> void:
 					continue
 				if Zones.dans_ligne(e.global_position, dep, _action["dir"], _action["dist"] * k2 + 0.5, 2.6, e.rayon):
 					_action["touches"].append(e)
-					e.recevoir({"montant": 78.0 * degats_arme, "source": self, "etourdir": 1.4, "critique": randf() < 0.25, "lourd": true})
+					e.recevoir({"montant": _degats(78.0, e), "source": self, "etourdir": 1.4, "critique": _crit(0.25), "lourd": true})
 					Sons.jouer("cloche", e.global_position, -2.0)
 					Effets.flash_lumiere(_scene(), e.global_position, Color(0.6, 0.9, 1.0), 3.0, 6.0)
 			if k2 >= 1.0:
@@ -625,7 +704,7 @@ func _physics_process(delta: float) -> void:
 	var e_in := entree + clavier
 	if e_in.length() > 1.0:
 		e_in = e_in.normalized()
-	var v_max := vitesse * facteur_vitesse() * (1.6 if _vent_t > 0.0 else 1.0)
+	var v_max := vitesse * (1.0 + stat("vitesse")) * facteur_vitesse() * (1.6 if _vent_t > 0.0 else 1.0)
 	var voulu := Vector3(e_in.x, 0, e_in.y) * v_max
 	var h := Vector3(velocity.x, 0, velocity.z).move_toward(voulu, 45.0 * delta)
 	velocity.x = h.x
@@ -665,5 +744,5 @@ func _frappe_auto(cible: EntiteCombat, d: Vector3) -> void:
 		return
 	Effets.taille(_scene(), global_position, d, 2.6, Color(1.0, 0.72, 0.4, 0.8), "slash_03.png", 0.18, -0.5)
 	if global_position.distance_to(cible.global_position) <= 3.4:
-		cible.recevoir({"montant": 14.0 * degats_arme, "source": self, "critique": randf() < 0.1})
+		cible.recevoir({"montant": _degats(14.0, cible, true), "source": self, "critique": _crit(0.1)})
 		Sons.jouer("coup_os", cible.global_position, -4.0)

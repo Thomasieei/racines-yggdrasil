@@ -62,6 +62,14 @@ func brancher(h: Heros) -> void:
 	sac_ui.set_script(load("res://scripts/interface/sac_ui.gd"))
 	add_child(sac_ui)
 	sac_ui.brancher(h)
+	talents_ui = CanvasLayer.new()
+	talents_ui.set_script(load("res://scripts/interface/talents_ui.gd"))
+	add_child(talents_ui)
+	talents_ui.brancher(h)
+	codex_ui = CanvasLayer.new()
+	codex_ui.set_script(load("res://scripts/interface/codex_ui.gd"))
+	add_child(codex_ui)
+	codex_ui.brancher(h)
 	heros.ramasse.connect(_sur_ramasse)
 	_construire_boutons_monde()
 
@@ -339,6 +347,11 @@ func _sur_mort(_e) -> void:
 # ---------- sac, action contextuelle, notifications ----------
 
 var sac_ui: CanvasLayer
+var talents_ui: CanvasLayer
+var codex_ui: CanvasLayer
+var _badge: Control
+var _badge_lab: Label
+var _arbre_btn: Control
 var _action_btn: Control
 var _action_lab: Label
 var _action_cible: Node = null
@@ -360,6 +373,24 @@ func _construire_boutons_monde() -> void:
 	sac_btn.gui_input.connect(func(ev):
 		if (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and ev.pressed):
 			sac_ui.basculer())
+	_arbre_btn = _rond(Vector2(982, 46), 60, "res://assets/icones_sorts/arbre.svg")
+	_arbre_btn.gui_input.connect(func(ev):
+		if (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and ev.pressed):
+			talents_ui.basculer())
+	var cx := _rond(Vector2(918, 46), 60, "res://assets/icones_sorts/codex.svg")
+	cx.gui_input.connect(func(ev):
+		if (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and ev.pressed):
+			codex_ui.basculer())
+	# pastille dorée : points de talent à placer
+	_badge = Control.new()
+	_badge.position = Vector2(38, -4)
+	_badge.size = Vector2(26, 26)
+	_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_arbre_btn.add_child(_badge)
+	disque(Vector2.ZERO, 26, Color("#E0A93A"), _badge)
+	_badge_lab = texte("", 13, Color("#2A1D0C"), Vector2(0, 3), _badge, false, 26, HORIZONTAL_ALIGNMENT_CENTER)
+	Profil.p().change.connect(_maj_badge)
+	_maj_badge()
 	_action_btn = _rond(Vector2(1076, 300), 74, "res://assets/icones_sorts/main.svg")
 	_action_lab = texte("", 14, Color("#FFF4DC"), Vector2(-30, 74), _action_btn, true, 134, HORIZONTAL_ALIGNMENT_CENTER)
 	_action_btn.gui_input.connect(func(ev):
@@ -375,6 +406,10 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_B or event.keycode == KEY_I:
 			sac_ui.basculer()
+		elif event.keycode == KEY_T:
+			talents_ui.basculer()
+		elif event.keycode == KEY_C:
+			codex_ui.basculer()
 		elif event.keycode == KEY_E:
 			_agir()
 
@@ -440,7 +475,71 @@ func _maj_notes(delta: float) -> void:
 			_notes.erase(e)
 		y += n.size.y + 4.0
 
+func _maj_badge() -> void:
+	if _badge == null:
+		return
+	var n := Profil.p().points_libres()
+	_badge.visible = n > 0
+	_badge_lab.text = str(n)
+
+## Réalisation du Codex : bandeau doux en haut, points gagnés, la pastille de l'arbre s'allume.
+func annoncer_realisation(r: Dictionary) -> void:
+	var n := Control.new()
+	n.position = Vector2(640 - 200, 96)
+	n.size = Vector2(400, 64)
+	n.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	n.modulate.a = 0.0
+	racine.add_child(n)
+	var f := neuf(UI + "rpg/panel_beigeLight.png", 14, Vector2(400, 64), Vector2.ZERO, n)
+	f.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	image("res://assets/icones_sorts/point.svg", Vector2(40, 40), Vector2(14, 12), n)
+	texte("Réalisation · " + r["nom"], 16, ENCRE, Vector2(64, 10), n, false, 320)
+	texte("+%d point%s de talent — Arbre des Racines" % [r["pts"], "s" if r["pts"] > 1 else ""], 13, Color("#7A4F0C"), Vector2(64, 34), n, false, 320)
+	Sons.jouer("cloche", heros.global_position if heros else Vector3.ZERO, -4.0, 1.6)
+	var tw := n.create_tween()
+	tw.tween_property(n, "modulate:a", 1.0, 0.25)
+	tw.parallel().tween_property(n, "position:y", 106.0, 0.25).from(86.0)
+	tw.tween_interval(3.2)
+	tw.tween_property(n, "modulate:a", 0.0, 0.5)
+	tw.tween_callback(n.queue_free)
+	if not Profil.p().vu("tuto_points"):
+		Profil.p().marquer_vu("tuto_points")
+		notifier("Touche l'arbre doré en haut pour placer tes points.", Color("#FFD36B"), "res://assets/icones_sorts/arbre.svg")
+
+## Une relique ! Le moment doit se sentir : rayons dorés, grande icône, nom dans la couleur.
+func celebrer_relique(o: Dictionary) -> void:
+	var c := Objets.couleur(o)
+	var n := Control.new()
+	n.set_anchors_preset(Control.PRESET_FULL_RECT)
+	n.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	racine.add_child(n)
+	var centre := Vector2(640, 250)
+	var k := {"t": 0.0}
+	n.draw.connect(func():
+		var a: float = clampf(k["t"] * 4.0, 0.0, 1.0) * clampf((3.4 - k["t"]) / 0.6, 0.0, 1.0)
+		for i in 14:
+			var ang: float = i * TAU / 14.0 + k["t"] * 0.35
+			var p1: Vector2 = centre + Vector2(cos(ang), sin(ang)) * 40.0
+			var p2: Vector2 = centre + Vector2(cos(ang), sin(ang)) * (150.0 + 20.0 * sin(k["t"] * 3.0 + i))
+			n.draw_line(p1, p2, Color(c.r, c.g, c.b, 0.22 * a), 10.0, true)
+		for i in 6:
+			n.draw_circle(centre, 90.0 - i * 12.0, Color(c.r, c.g, c.b, 0.05 * a)))
+	var ic := image(o["icone"], Vector2(120, 120), centre - Vector2(60, 60), n)
+	ic.pivot_offset = Vector2(60, 60)
+	var t1 := texte("RELIQUE !", 30, c.lightened(0.25), Vector2(0, 330), n, true, 1280, HORIZONTAL_ALIGNMENT_CENTER)
+	var t2 := texte(o["nom"] + " · " + Objets.NOMS_RARETE[o["rarete"]], 20, c.lightened(0.15), Vector2(0, 370), n, true, 1280, HORIZONTAL_ALIGNMENT_CENTER)
+	var t3 := texte(Objets.texte_relique(o) + " — à porter depuis le sac", 15, Color("#FFF4DC"), Vector2(0, 400), n, true, 1280, HORIZONTAL_ALIGNMENT_CENTER)
+	Sons.jouer("cloche", heros.global_position if heros else Vector3.ZERO, 0.0, 1.25)
+	Sons.jouer("pret", heros.global_position if heros else Vector3.ZERO, -2.0, 0.8)
+	var tw := n.create_tween()
+	tw.tween_method(func(v): k["t"] = v; n.queue_redraw(); ic.scale = Vector2.ONE * (0.6 + 0.4 * minf(v * 3.0, 1.0) + 0.04 * sin(v * 6.0)); ic.modulate.a = clampf((3.4 - v) / 0.6, 0.0, 1.0); t1.modulate.a = ic.modulate.a; t2.modulate.a = ic.modulate.a; t3.modulate.a = ic.modulate.a, 0.0, 3.4, 3.4)
+	tw.tween_callback(n.queue_free)
+
 func _sur_ramasse(or_: int, objets: Array, origine: String) -> void:
+	for o in objets:
+		if o.get("type", "") == "relique":
+			celebrer_relique(o)
+			break
 	if or_ > 0:
 		notifier("+%d or" % or_, Color("#FFD36B"), "res://assets/icones_objets/pieces_or.png")
 	for o in objets:

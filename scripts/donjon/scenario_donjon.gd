@@ -195,6 +195,7 @@ func _sur_evenement(nom: String, d: Dictionary) -> void:
 		recit.bandeau("Quête accomplie", q["titre"] + " — %d or" % q["or"], Color("#FFD34E"))
 		Sons.jouer("cloche", heros.global_position, 0.0, 1.2)
 		_quete_i += 1
+		Jeu.evenement("quete", {"id": q["id"]})
 		if _quete_i < QUETES.size():
 			_egare.regler_marqueur("!")
 			recit.quete("Bjorn a autre chose pour toi", "Retourne au camp des Égarés")
@@ -421,6 +422,7 @@ func _process(_d: float) -> void:
 	if id == "" or id == _lieu:
 		return
 	_lieu = id
+	Jeu.evenement("lieu", {"id": id})
 	var nom: String = l["nom"]
 	match id:
 		"camp", "puits":
