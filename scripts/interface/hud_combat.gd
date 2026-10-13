@@ -199,6 +199,15 @@ func _dessiner_barres_ennemis() -> void:
 	for e in get_tree().get_nodes_in_group("monstre"):
 		if e.est_mort or not e.has_method("en_combat") or not e.en_combat():
 			continue
+		if e.fiche.get("elite", false) and e.est_eveille():
+			# barre de chef, sous le titre : on sait à qui on a affaire
+			var lb := 420.0
+			var rb := Rect2(Vector2(640 - lb / 2.0, 84), Vector2(lb, 12))
+			_barres.draw_rect(rb.grow(3.0), Color(0, 0, 0, 0.8))
+			_barres.draw_rect(Rect2(rb.position, Vector2(lb * e.pv / e.pv_max, 12)), Color("#C2302A"))
+			_barres.draw_rect(Rect2(rb.position, Vector2(lb * e.pv / e.pv_max, 3)), Color(1, 0.75, 0.6, 0.6))
+			_barres.draw_string_outline(police, Vector2(640 - 200, 80), e.nom_affiche() + " — Élite", HORIZONTAL_ALIGNMENT_CENTER, 400, 15, 5, Color(0, 0, 0, 0.9))
+			_barres.draw_string(police, Vector2(640 - 200, 80), e.nom_affiche() + " — Élite", HORIZONTAL_ALIGNMENT_CENTER, 400, 15, Color("#FFB08A"))
 		var monde: Vector3 = e.global_position + Vector3(0, e.hauteur_barre, 0)
 		if cam.is_position_behind(monde):
 			continue

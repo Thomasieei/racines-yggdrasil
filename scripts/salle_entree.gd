@@ -95,14 +95,21 @@ func _murs() -> void:
 	for i in TAILLE:
 		var x := 2 + 4 * i
 		# mur nord : arche centrale = sortie vers la suite du donjon
-		_poser("wall_arched" if i == 3 else "wall", Vector3(x, 0, 0))
+		if i == 3:
+			# l'arche s'ouvre sur le tunnel de la caverne : seuls ses deux montants arrêtent le joueur
+			_poser("wall_arched", Vector3(x, 0, 0), 0.0, 1.0, false)
+			for dx in [-1.6, 1.6]:
+				_boite(Vector3(x + dx, 2, 0), Vector3(0.8, 4, 1))
+		else:
+			_poser("wall", Vector3(x, 0, 0))
 		_poser("wall_cracked" if i in [2, 5] else "wall", Vector3(0, 0, x), 90.0)            # ouest
 		_poser("wall_cracked" if i in [1, 4] else "wall", Vector3(4 * TAILLE, 0, x), -90.0)  # est
 	for c in [Vector3(0, 0, 0), Vector3(4 * TAILLE, 0, 0)]:
 		_poser("pillar", c)
 	# enceinte de sécurité : rien ne doit jamais sortir de la salle, quelle que soit la pièce posée
 	var l := 4.0 * TAILLE
-	for b in [[Vector3(l / 2, 2, -0.4), Vector3(l + 2, 4, 1)], [Vector3(l / 2, 2, l + 0.9), Vector3(l + 2, 4, 1)],
+	# nord : en deux morceaux, l'arche reste libre
+	for b in [[Vector3(5.5, 2, -0.4), Vector3(13, 4, 1)], [Vector3(22.5, 2, -0.4), Vector3(13, 4, 1)], [Vector3(l / 2, 2, l + 0.9), Vector3(l + 2, 4, 1)],
 			[Vector3(-0.4, 2, l / 2), Vector3(1, 4, l + 2)], [Vector3(l + 0.4, 2, l / 2), Vector3(1, 4, l + 2)]]:
 		var corps := StaticBody3D.new()
 		var forme := CollisionShape3D.new()
@@ -112,6 +119,16 @@ func _murs() -> void:
 		corps.position = b[0]
 		corps.add_child(forme)
 		add_child(corps)
+
+func _boite(pos: Vector3, taille: Vector3) -> void:
+	var corps := StaticBody3D.new()
+	var forme := CollisionShape3D.new()
+	var boite := BoxShape3D.new()
+	boite.size = taille
+	forme.shape = boite
+	corps.position = pos
+	corps.add_child(forme)
+	add_child(corps)
 
 func _decor() -> void:
 	# point focal : coffre doré sur l'axe de la sortie, encadré de bannières et de bougies

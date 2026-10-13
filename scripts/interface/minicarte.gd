@@ -49,6 +49,11 @@ func _dessiner() -> void:
 				var r: Rect2 = f["r"]
 				var a := _vers_ecran(r.position, c)
 				_poly_coupe([a, a + Vector2(r.size.x, 0) * echelle, a + r.size * echelle, a + Vector2(0, r.size.y) * echelle], f["couleur"], o)
+			"poly":
+				var pp := PackedVector2Array()
+				for q in f["pts"]:
+					pp.append(_vers_ecran(q, c))
+				_dessin.draw_colored_polygon(pp, f["couleur"])
 			"cercle":
 				var ce := _vers_ecran(f["c"], c)
 				if ce.distance_to(o) < rayon_px + f["r"] * echelle:
@@ -64,7 +69,7 @@ func _dessiner() -> void:
 		var d := p - o
 		var dedans := d.length() < rayon_px - 8.0
 		if not dedans:
-			if l["genre"] != "sur" and l["genre"] != "portail":
+			if l["genre"] not in ["sur", "portail", "elite"]:
 				continue
 			p = o + d.normalized() * (rayon_px - 8.0)   # les lieux importants restent épinglés au bord
 		_icone(p, l["genre"], 1.0 if dedans else 0.75)
@@ -114,3 +119,7 @@ func _icone(p: Vector2, genre: String, alpha: float) -> void:
 			_dessin.draw_colored_polygon(e, Color(1.0, 0.85, 0.45, alpha))
 		"danger":
 			_dessin.draw_circle(p, 3.5, Color(0.85, 0.2, 0.15, alpha))
+		"elite":
+			# couronne orange : un élite et son coffre
+			var cr := PackedVector2Array([p + Vector2(-7, 4), p + Vector2(-7, -3), p + Vector2(-3.5, 0), p + Vector2(0, -6), p + Vector2(3.5, 0), p + Vector2(7, -3), p + Vector2(7, 4)])
+			_dessin.draw_colored_polygon(cr, Color(1.0, 0.6, 0.18, alpha))

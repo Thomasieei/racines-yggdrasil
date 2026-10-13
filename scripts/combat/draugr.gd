@@ -36,6 +36,20 @@ const TYPES := {
 			 "anim": "1H_Ranged_Shoot", "impact_anim": 0.45, "recup": 0.8, "cd": 3.2, "son": "metal", "projectile": true},
 		],
 	},
+	"jarl": {
+		"nom": "Jarl Hrafnkel", "modele": "squelette_warrior.glb", "arme_d": "skeleton_axe.glb", "arme_g": "skeleton_shield_large_a.glb",
+		"pv": 1900.0, "vitesse": 3.1, "echelle": 1.5, "portee": 3.2, "garde": 0.0, "armure": true, "elite": true,
+		"attaques": [
+			{"id": "fendre", "forme": "cone", "rayon": 4.0, "angle": 1.0, "prep": 1.05, "degats": 260.0,
+			 "anim": "2H_Melee_Attack_Chop", "impact_anim": 0.62, "recup": 0.9, "cd": 2.4, "son": "coup_lourd"},
+			{"id": "tourbillon", "forme": "cercle", "rayon": 4.6, "angle": 0.0, "prep": 1.4, "degats": 300.0,
+			 "anim": "2H_Melee_Attack_Spin", "impact_anim": 0.9, "recup": 1.4, "cd": 8.0, "son": "coup_lourd",
+			 "sur_soi": true, "portee_min": 0.0, "portee_max": 4.5},
+			{"id": "saut", "forme": "cercle", "rayon": 3.4, "angle": 0.0, "prep": 1.2, "degats": 280.0,
+			 "anim": "1H_Melee_Attack_Jump_Chop", "impact_anim": 0.72, "recup": 1.3, "cd": 10.0, "son": "atterrissage",
+			 "portee_min": 5.0, "portee_max": 10.0, "bond": true, "etourdir": 0.8},
+		],
+	},
 	"mage": {
 		"nom": "Draugr nécromant", "modele": "squelette_mage.glb", "arme_d": "skeleton_staff.glb", "arme_g": "",
 		"pv": 240.0, "vitesse": 2.7, "echelle": 1.0, "portee": 10.0, "garde": 6.0, "armure": false,
@@ -195,7 +209,9 @@ func _preparer(a: Dictionary) -> void:
 			_point_attaque = global_position
 			_tele = Telegraphe.creer(get_parent(), Telegraphe.Forme.LIGNE, global_position + _dir_attaque * 0.5, _dir_attaque, a["rayon"], a["angle"], a["prep"], couleur)
 		"cercle":
-			if a.get("sur_cible", false):
+			if a.get("sur_soi", false):
+				_point_attaque = global_position
+			elif a.get("sur_cible", false):
 				_point_attaque = cible.global_position
 			else:
 				# saut : point d'arrivée devant la cible, figé
@@ -239,6 +255,10 @@ func _impact() -> void:
 				global_position = Vector3(_point_attaque.x, global_position.y, _point_attaque.z)
 				Effets.onde(get_parent(), _point_attaque, a["rayon"], Color(1.0, 0.35, 0.2))
 				Effets.poussiere(get_parent(), _point_attaque, 14)
+			elif a.get("sur_soi", false):
+				Effets.onde(get_parent(), _point_attaque, a["rayon"], Color(1.0, 0.4, 0.2), 0.5)
+				Effets.taille(get_parent(), global_position, _dir_attaque, a["rayon"], Color(1.0, 0.45, 0.3, 0.9), "slash_02.png", 0.3, -3.0)
+				Effets.poussiere(get_parent(), _point_attaque, 10)
 			else:
 				_explosion_givre(_point_attaque, a["rayon"])
 			Sons.jouer(a["son"], _point_attaque, 0.0)

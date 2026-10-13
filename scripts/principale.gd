@@ -30,10 +30,11 @@ func _ready() -> void:
 			carte = a.substr(8)
 	if carte_suivante != "":
 		carte = carte_suivante
+	if carte == "donjon":
+		carte = "crypte"
 	if carte == "crypte":
 		_environnement()
-		monde = Node3D.new()
-		monde.set_script(load("res://scripts/salle_entree.gd"))
+		monde = Caverne.new()
 	else:
 		_environnement_surface()
 		monde = CarteSurface.new()
@@ -52,8 +53,8 @@ func _ready() -> void:
 	# lumière portée par le héros : chaude, douce
 	var lj := OmniLight3D.new()
 	lj.light_color = Color(1.0, 0.78, 0.55)
-	lj.light_energy = 1.1 if carte == "crypte" else 0.5
-	lj.omni_range = 9.0
+	lj.light_energy = 1.3 if carte == "crypte" else 0.5
+	lj.omni_range = 11.0 if carte == "crypte" else 9.0
 	lj.position = Vector3(0, 3.2, 0.6)
 	joueur.add_child(lj)
 
@@ -85,8 +86,16 @@ func _ready() -> void:
 	couche_joy.add_child(joy)
 	joy.vecteur_change.connect(func(v): joueur.entree = v)
 
-	if not "--sans-monstres" in args and carte == "crypte":
+	if "--depart=arche" in args:
+		joueur.position = Vector3(14, 0.1, 4.0)
+	if not "--sans-monstres" in args and not "--depart=arche" in args and carte == "crypte":
 		_meutes()
+	if carte == "crypte" and not "--demo=combat" in args:
+		var sd := Node.new()
+		sd.set_script(load("res://scripts/donjon/scenario_donjon.gd"))
+		sd.name = "ScenarioDonjon"
+		add_child(sd)
+		sd.demarrer(self, joueur, hud)
 	if carte == "surface":
 		var sc := Node.new()
 		sc.set_script(load("res://scripts/surface/scenario.gd"))
@@ -102,6 +111,11 @@ func _ready() -> void:
 			demo.set_script(load("res://scripts/demo_combat.gd"))
 			add_child(demo)
 			demo.lancer(joueur, camera)
+		elif a == "--demo=donjon":
+			var demo3 := Node.new()
+			demo3.set_script(load("res://scripts/demo_donjon.gd"))
+			add_child(demo3)
+			demo3.lancer(joueur, self)
 		elif a == "--demo=surface":
 			var demo2 := Node.new()
 			demo2.set_script(load("res://scripts/demo_surface.gd"))
@@ -166,15 +180,15 @@ func _environnement() -> void:
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color(0.03, 0.035, 0.055)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.32, 0.38, 0.6)
-	env.ambient_light_energy = 0.28
+	env.ambient_light_color = Color(0.3, 0.36, 0.6)
+	env.ambient_light_energy = 0.3
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.glow_enabled = true
 	env.glow_intensity = 0.6
 	env.glow_bloom = 0.08
 	env.fog_enabled = true
-	env.fog_light_color = Color(0.05, 0.06, 0.1)
-	env.fog_density = 0.02
+	env.fog_light_color = Color(0.012, 0.016, 0.03)
+	env.fog_density = 0.012
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
@@ -232,8 +246,8 @@ func _capture_si_demandee() -> void:
 			# vue d'ensemble orthographique, nord en haut
 			var c2 := Camera3D.new()
 			c2.projection = Camera3D.PROJECTION_ORTHOGONAL
-			c2.size = 112.0
-			c2.position = Vector3(86, 120, 55)
+			c2.size = 112.0 if carte == "surface" else 120.0
+			c2.position = Vector3(86, 120, 55) if carte == "surface" else Vector3(22, 120, -40)
 			c2.rotation_degrees.x = -90
 			add_child(c2)
 			c2.current = true
@@ -245,6 +259,7 @@ func _capture_si_demandee() -> void:
 		elif a.begins_with("--tour="):
 			# visite photo : plusieurs positions, une capture chacune
 			var lieux := a.substr(7).split(";")
+			joueur.invulnerable_t = 99999.0   # visite photo : le héros ne doit pas mourir entre deux clichés
 			for i in lieux.size():
 				var c := lieux[i].split(",")
 				joueur.global_position = Vector3(float(c[0]), 0.1, float(c[1]))
