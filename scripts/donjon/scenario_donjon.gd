@@ -126,7 +126,9 @@ func demarrer(p: Node, h: Heros, hd: CanvasLayer) -> void:
 	egare.activer_parole(_parler_bjorn)
 	_egare = egare
 	Jeu.ecouteurs.append(_sur_evenement)
+	Jeu.ecouteurs.append(_rune_evenement)
 	Heros.jcj_actif = true
+	_runes()
 	_minicarte()
 	if not "--sans-bots" in OS.get_cmdline_user_args():
 		_lancer_bots()
@@ -138,6 +140,8 @@ func demarrer(p: Node, h: Heros, hd: CanvasLayer) -> void:
 		_test_quetes()
 	if "--demo=bots" in OS.get_cmdline_user_args():
 		_demo_bots()
+	if "--test-runes" in OS.get_cmdline_user_args():
+		_test_runes()
 	if "--test-jcj" in OS.get_cmdline_user_args():
 		_test_jcj()
 	hud.regler_titre("Étage 1 · Crypte des nains", "Donjon du jour · se referme dans 14:52")
@@ -239,6 +243,54 @@ func _reveiller_boss() -> void:
 		cam.secouer(1.2)
 	if hud.minicarte:
 		hud.minicarte.lieux.append({"c": Vector2(ARENE_BOSS.x, ARENE_BOSS.z), "genre": "elite"})
+
+# ---------------- runes draconiques ----------------
+## Trois fragments, trois façons de les trouver, rien sur la carte :
+## 1) derrière le lac, là où personne ne va ; 2) le gouffre, à qui le contemple assez longtemps ;
+## 3) l'enclume de Brokk, une fois le forgeron déchu tombé. Ils réapparaissent à chaque descente
+## tant que la voie draconique n'est pas choisie (perdus à la mort avec le sac).
+const RUNE_LAC := Vector3(-106, 0, 2)
+var _rune_abime := false
+var _rune_forge := false
+
+func _a_le_fragment(n: int) -> bool:
+	for o in heros.sac.objets:
+		if o.get("type", "") == "rune" and o.get("numero", 0) == n:
+			return true
+	for o in heros.sac.objets:
+		if o.get("type", "") == "oeuf_runique":
+			return true
+	return false
+
+func _runes() -> void:
+	if Profil.p().classe != "":
+		return
+	if not _a_le_fragment(1):
+		RuneDraconique.creer.call_deferred(principale, RUNE_LAC, 1)
+
+func _rune_evenement(nom: String, d: Dictionary) -> void:
+	if Profil.p().classe != "":
+		return
+	if nom == "abime" and not _rune_abime and not _a_le_fragment(2):
+		_rune_abime = true
+		# la rune remonte du gouffre, au bord, devant le joueur
+		var g: Vector3 = d["pos"] - Caverne.GOUFFRE
+		g.y = 0
+		var bord := Caverne.GOUFFRE + g.normalized() * (Caverne.GOUFFRE_R.x * 0.9 if absf(g.x) > absf(g.z) else Caverne.GOUFFRE_R.y * 1.2)
+		var pos: Vector3 = (bord + d["pos"]) * 0.5
+		pos.y = 0
+		var r := RuneDraconique.creer(principale, pos + Vector3(0, -2.5, 0), 2)
+		r.create_tween().tween_property(r, "position:y", 0.0, 2.5).set_ease(Tween.EASE_OUT)
+		Effets.etincelles(principale, pos + Vector3(0, 0.5, 0), Vector3.UP, Color(0.7, 0.4, 1.0), 30, 6.0, "star_06.png", 0.4)
+		Sons.jouer("activation", pos, 0.0, 0.5)
+		recit.voix("???", "Le vide t'a regardé aussi longtemps que tu l'as regardé.", 4.0)
+	if nom == "tue" and d.get("type", "") == "brokk" and not _rune_forge and not _a_le_fragment(3):
+		_rune_forge = true
+		await get_tree().create_timer(3.0).timeout
+		var pos2 := Caverne.ENCLUME_BROKK + Vector3(0, 0, 2.5)
+		RuneDraconique.creer(principale, pos2, 3)
+		Effets.onde(principale, pos2, 4.0, Color(0.7, 0.4, 1.0))
+		recit.voix("???", "L'enclume se souvient de ce qu'on y a forgé.", 4.0)
 
 # ---------------- aventuriers IA ----------------
 
@@ -588,4 +640,37 @@ func _demo_bots() -> void:
 	pilote.objectif = {"genre": "camp", "camp": "", "pos": ARENE_BOSS}
 	pilote._aller_vers(ARENE_BOSS)
 	await get_tree().create_timer(22.0).timeout
+	get_tree().quit()
+
+func _test_runes() -> void:
+	heros.invulnerable_t = 1e9
+	while nav == null or not nav.pret:
+		await get_tree().process_frame
+	var ch := nav.chemin(Vector3(14, 0, 10), RUNE_LAC)
+	printerr("TEST chemin crypte -> rune du lac : ", ch.size(), " points, fin ", ch[ch.size() - 1] if ch.size() > 0 else "aucun")
+	for n in [1, 2, 3]:
+		if n == 2:
+			Jeu.evenement("abime", {"pos": Caverne.GOUFFRE + Vector3(0, 0, 9)})
+			await get_tree().create_timer(3.0).timeout
+		if n == 3:
+			Jeu.evenement("tue", {"type": "brokk", "elite": true, "joueur": true})
+			await get_tree().create_timer(3.5).timeout
+		var rune: RuneDraconique = null
+		for r in get_tree().get_nodes_in_group("interactif"):
+			if r is RuneDraconique and r.numero == n:
+				rune = r
+		if rune == null:
+			printerr("TEST rune ", n, " ABSENTE")
+			continue
+		heros.global_position = rune.global_position + Vector3(0, 0.1, 2.0)
+		await get_tree().create_timer(1.0).timeout
+		if n == 1:
+			await _cap("rune")
+		rune.interagir(heros)
+		await get_tree().create_timer(3.0).timeout
+		printerr("TEST rune ", n, " prise=", rune == null or not is_instance_valid(rune) or rune.pris)
+	await get_tree().create_timer(0.5).timeout
+	await _cap("fusion")
+	var oeufs := heros.sac.objets.filter(func(o): return o["type"] == "oeuf_runique")
+	printerr("TEST oeuf runique=", oeufs.size(), " fragments restants=", heros.sac.objets.filter(func(o): return o["type"] == "rune").size(), " runes codex=", Profil.p().valeur("runes"))
 	get_tree().quit()

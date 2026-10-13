@@ -112,7 +112,7 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 	elif event is InputEventScreenDrag and event.index == _doigt:
 		var d: Vector2 = event.position - _depart
-		if d.length() > ZONE_MORTE and Heros.COMPETENCES[id]["visee"] == "direction":
+		if d.length() > ZONE_MORTE and heros.competence(id)["visee"] == "direction":
 			_vise = true
 			# caméra sans lacet : l'écran et le sol partagent les mêmes axes
 			_dir = Vector3(d.x, 0, d.y).normalized()
@@ -131,8 +131,8 @@ func _process(delta: float) -> void:
 			appui_long.emit(id)
 			_appui_t = -999.0
 	var cd: float = heros.cds[id]
-	var total: float = Heros.COMPETENCES[id]["cd"]
-	var cout: float = Heros.COMPETENCES[id]["cout"]
+	var total: float = heros._recharge(id)
+	var cout: float = heros._cout(id)
 	var pret := cd <= 0.0
 	if pret and not _pret_avant:
 		_eclat = 1.0

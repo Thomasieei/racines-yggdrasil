@@ -28,7 +28,11 @@ Donjon d'extraction mobile (Godot 4.3, paysage). Un donjon du jour partagé, Fre
 11. **Œufs de dragon** : rares. Dans le sac, « Faire éclore » : le bébé est commun, rare, épique, légendaire ou mythique (au-delà du bleu, c'est extrêmement rare) avec 1 à 5 étoiles de puissance. On l'équipe comme **acolyte** (il crache du feu et grandit en gagnant de l'expérience) ou on le revend au marchand.
 12. **Sac** (bouton en haut à droite, ou B) : 30 cases, arme et acolyte équipés, valeur de ce qu'on risque. **Tout ce qu'on porte est perdu à la mort** : si un autre aventurier nous tue, il prend tout ; sinon tout reste sur la dépouille, que n'importe qui peut fouiller.
 13. **Autres aventuriers (IA)** : 4 à 7 joueurs simulés en attendant le vrai multijoueur. Ils farment les camps, minent, ouvrent les coffres, boivent leurs potions, partent parfois AFK… et certains attaquent quand on est affaibli. Pseudo bleu = neutre, rouge = hostile. On peut aussi les attaquer (hors zones sûres) et leur prendre leur sac.
-14. Mourir ramène au sanctuaire.
+14. **Arbre des Racines** (bouton arbre doré, ou T) : 15 talents en trois racines — Loup (force), Chêne (endurance), Corbeau (ruse). Les paliers s'ouvrent à 5, 10, 15 et 20 points investis ; les trois ultimes sont incompatibles. Réinitialisation contre 200 or.
+15. **Codex** (bouton livre, ou C) : les réalisations donnent les points de talent (1 à 10 chacune). Certaines sont des secrets : on n'en voit que l'indice.
+16. **Reliques** : six emplacements dans le sac, de +1,6 % (vert) à +35 % (rouge) sur la puissance des compétences, les PV, l'énergie ou la recharge.
+17. **Voies draconiques** : aucune indication sur la carte. Freya n'en dit qu'un mot. Ceux qui trouvent les trois fragments de rune les voient se rejoindre en un œuf runique ; briser le sceau mène à une épreuve solo où l'équipement ne compte plus, puis au choix définitif entre trois pouvoirs incompatibles (Souffle, Écailles, Ailes), chacun avec sa force et sa faiblesse. C'est le titre de classe qui donne les compétences ; l'arme n'ajoute que de la puissance.
+18. Mourir ramène au sanctuaire. Le sac suit le joueur d'une carte à l'autre, mais reste sur le corps à la mort.
 
 Pas encore branchés : menus du marchand et de la forge (la vente du sac marche près d'un marchand), vrai multijoueur en ligne.
 
@@ -58,6 +62,7 @@ Sorts du barbare : Fendoir (cône), Bond du berserker (saut), Ruée runique (inc
 - Interface : `scripts/interface/`.
 - Objets, sac, coffres, filons, œufs : `scripts/objets/`. Aventuriers IA : `scripts/combat/bot.gd` (cerveau) et `scripts/donjon/nav_caverne.gd` (grille de déplacement).
 - Options de lancement utiles (après `--`) : `--carte=crypte`, `--sans-intro`, `--depart=arche`, `--sans-bots`, `--demo=combat`, `--demo=surface`, `--demo=donjon`, `--demo=bots`, `--plan=fichier.png`.
-- Tests : `--test-bots`, `--test-jcj`, `--test-quetes`, `--test-objets`, `--test-repeuplement`.
+- Progression : `scripts/progression/` (profil sauvegardé, talents, codex, classes, suivi des réalisations).
+- Tests : `--test-bots`, `--test-jcj`, `--test-quetes`, `--test-objets`, `--test-repeuplement`, `--test-progression`, `--test-runes`, `--carte=epreuve --test-epreuve` ; `--profil-neuf`, `--classe=souffle|ecailles|ailes`.
 
 Assets : packs KayKit et Kenney (CC0), détail dans `LICENCES.md`.

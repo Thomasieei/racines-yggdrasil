@@ -196,7 +196,7 @@ func _remplir_fiche() -> void:
 	_case(o, Vector2(16, 16), 84, f)
 	var nom := texte(o["nom"], 18, c.darkened(0.3), Vector2(110, 18), f, false, 240)
 	nom.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	texte(Objets.NOMS_RARETE[o["rarete"]] + " · " + {"ressource": "ressource", "arme": "arme", "potion": "consommable", "oeuf": "œuf", "dragon": "acolyte", "relique": "relique"}[o["type"]], 13, ENCRE2, Vector2(110, 62), f, false)
+	texte(Objets.NOMS_RARETE[o["rarete"]] + " · " + {"ressource": "ressource", "arme": "arme", "potion": "consommable", "oeuf": "œuf", "dragon": "acolyte", "relique": "relique", "rune": "fragment", "oeuf_runique": "œuf scellé"}[o["type"]], 13, ENCRE2, Vector2(110, 62), f, false)
 	texte("Valeur : %s or%s" % [_milliers(o["valeur"]), (" (×%d)" % o["qte"]) if o["qte"] > 1 else ""], 13, Color("#7A4F0C"), Vector2(110, 80), f, false)
 	var y := 116.0
 	var lignes: Array = []
@@ -212,6 +212,10 @@ func _remplir_fiche() -> void:
 			lignes = ["Rend 30 % de la vie en 4 s.", "Aussi utilisable depuis la roue des sorts."]
 		"ressource":
 			lignes = ["Se vend au marchand, sert à la forge."]
+		"rune":
+			lignes = ["Un éclat de pierre qui vibre dans la main.", "On dit que les fragments se cherchent entre eux.", "Perdu avec le sac si tu meurs."]
+		"oeuf_runique":
+			lignes = ["Scellé par trois runes.", "Ce qui dort dedans ne s'éveille que pour qui l'affronte seul, sans arme ni relique.", "Briser le sceau t'emmène dans l'épreuve. Ton sac t'attendra."]
 		"relique":
 			lignes = [Objets.texte_relique(o), "Une relique portée agit en permanence.", "Six au plus. Perdue avec le sac si tu meurs."]
 	for l in lignes:
@@ -224,6 +228,8 @@ func _remplir_fiche() -> void:
 	var actions: Array = []
 	var dans_sac := heros.sac.objets.has(o)
 	match o["type"]:
+		"oeuf_runique":
+			actions.append(["Briser le sceau", func(): fermer_sac(); get_tree().current_scene.lancer_epreuve(o)])
 		"relique":
 			var porte: int = heros.sac.reliques.find(o)
 			if porte >= 0:

@@ -15,7 +15,8 @@ var compteurs := {}         ## clé -> valeur (tués, mètres, coffres…)
 var obtenues := {}          ## id réalisation -> true
 var talents := {}           ## id talent -> rang
 var points_gagnes := 0
-var vus := {}               ## petits drapeaux (tutoriels déjà montrés, lieux découverts…)
+var vus := {}
+var classe := ""            ## "" = Berserker ; "souffle", "ecailles", "ailes" = voies draconiques
 var _sale := false
 var _t_sauve := 0.0
 
@@ -132,9 +133,13 @@ func sauver(force := false) -> void:
 	c.set_value("p", "talents", talents)
 	c.set_value("p", "points", points_gagnes)
 	c.set_value("p", "vus", vus)
+	c.set_value("p", "classe", classe)
 	c.save(FICHIER)
 
 func _charger() -> void:
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--classe="):
+			classe = a.substr(9)
 	if "--profil-neuf" in OS.get_cmdline_user_args():
 		return
 	var c := ConfigFile.new()
@@ -145,3 +150,4 @@ func _charger() -> void:
 	talents = c.get_value("p", "talents", {})
 	points_gagnes = c.get_value("p", "points", 0)
 	vus = c.get_value("p", "vus", {})
+	classe = c.get_value("p", "classe", "")

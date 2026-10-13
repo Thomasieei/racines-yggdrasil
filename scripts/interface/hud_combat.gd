@@ -98,7 +98,7 @@ func construire_roue() -> void:
 	for b in ROUE:
 		var bt: Control = BOUTON.new()
 		racine.add_child(bt)
-		bt.preparer(heros, b[0], b[1], Color.WHITE, b[3])
+		bt.preparer(heros, b[0], heros.competence(b[0]).get("icone", b[1]), Color.WHITE, b[3])
 		bt.position = o + b[2] - Vector2(b[3], b[3]) / 2.0
 		bt.appui_long.connect(_montrer_fiche)
 
@@ -158,7 +158,8 @@ func _haut_gauche() -> void:
 	var pe := Vector2(100, 48)
 	_fond_barre(pe, Vector2(LARG_ENERGIE, 16), Color(0.04, 0.07, 0.14, 0.85))
 	_energie_plein = neuf(UI + "aventure/progress_blue_border.png", 8, Vector2(LARG_ENERGIE, 16), pe)
-	texte("Thomas · niv. 12", 15, OR, Vector2(102, 68))
+	var cl: Dictionary = Classes.fiche(Profil.p().classe)
+	texte("Thomas · " + cl["titre"], 15, cl["couleur"].lerp(OR, 0.3), Vector2(102, 68))
 
 func _fond_barre(pos: Vector2, taille: Vector2, c: Color) -> void:
 	var fond := Panel.new()
@@ -312,14 +313,14 @@ void fragment() {
 func _montrer_fiche(id: String) -> void:
 	if _fiche:
 		_fiche.queue_free()
-	var c: Dictionary = Heros.COMPETENCES[id]
+	var c: Dictionary = heros.competence(id)
 	_fiche = neuf(UI + "rpg/panel_beigeLight.png", 18, Vector2(330, 132), Vector2(1280 - 330 - 300, 576 - 132 - 150))
 	texte(c["nom"], 19, ENCRE, Vector2(18, 12), _fiche, false)
 	var infos := "Recharge %s s" % _virgule(c["cd"])
 	if c["cout"] > 0.0:
 		infos += "  ·  %d énergie" % int(c["cout"])
 	texte(infos, 13, ENCRE2, Vector2(18, 40), _fiche, false)
-	var desc := texte(FICHES[id], 14, ENCRE, Vector2(18, 64), _fiche, false, 294)
+	var desc := texte(c.get("fiche", FICHES[id]), 14, ENCRE, Vector2(18, 64), _fiche, false, 294)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_fiche_t = 3.0
 
@@ -508,6 +509,24 @@ func annoncer_realisation(r: Dictionary) -> void:
 
 ## Une relique ! Le moment doit se sentir : rayons dorés, grande icône, nom dans la couleur.
 func celebrer_relique(o: Dictionary) -> void:
+	celebrer(o, "RELIQUE !", o["nom"] + " · " + Objets.NOMS_RARETE[o["rarete"]], Objets.texte_relique(o) + " — à porter depuis le sac")
+
+var _file_celebrations: Array = []
+var _celebration_en_cours := false
+
+## Grand moment : rayons, grande icône, trois lignes. Les célébrations se suivent, jamais l'une sur l'autre.
+func celebrer(o: Dictionary, titre: String, ligne1: String, ligne2: String) -> void:
+	_file_celebrations.append([o, titre, ligne1, ligne2])
+	if _celebration_en_cours:
+		return
+	_celebration_en_cours = true
+	while not _file_celebrations.is_empty():
+		var e: Array = _file_celebrations.pop_front()
+		_celebrer(e[0], e[1], e[2], e[3])
+		await get_tree().create_timer(3.5).timeout
+	_celebration_en_cours = false
+
+func _celebrer(o: Dictionary, titre: String, ligne1: String, ligne2: String) -> void:
 	var c := Objets.couleur(o)
 	var n := Control.new()
 	n.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -526,9 +545,9 @@ func celebrer_relique(o: Dictionary) -> void:
 			n.draw_circle(centre, 90.0 - i * 12.0, Color(c.r, c.g, c.b, 0.05 * a)))
 	var ic := image(o["icone"], Vector2(120, 120), centre - Vector2(60, 60), n)
 	ic.pivot_offset = Vector2(60, 60)
-	var t1 := texte("RELIQUE !", 30, c.lightened(0.25), Vector2(0, 330), n, true, 1280, HORIZONTAL_ALIGNMENT_CENTER)
-	var t2 := texte(o["nom"] + " · " + Objets.NOMS_RARETE[o["rarete"]], 20, c.lightened(0.15), Vector2(0, 370), n, true, 1280, HORIZONTAL_ALIGNMENT_CENTER)
-	var t3 := texte(Objets.texte_relique(o) + " — à porter depuis le sac", 15, Color("#FFF4DC"), Vector2(0, 400), n, true, 1280, HORIZONTAL_ALIGNMENT_CENTER)
+	var t1 := texte(titre, 30, c.lightened(0.25), Vector2(0, 330), n, true, 1280, HORIZONTAL_ALIGNMENT_CENTER)
+	var t2 := texte(ligne1, 20, c.lightened(0.15), Vector2(0, 370), n, true, 1280, HORIZONTAL_ALIGNMENT_CENTER)
+	var t3 := texte(ligne2, 15, Color("#FFF4DC"), Vector2(0, 400), n, true, 1280, HORIZONTAL_ALIGNMENT_CENTER)
 	Sons.jouer("cloche", heros.global_position if heros else Vector3.ZERO, 0.0, 1.25)
 	Sons.jouer("pret", heros.global_position if heros else Vector3.ZERO, -2.0, 0.8)
 	var tw := n.create_tween()

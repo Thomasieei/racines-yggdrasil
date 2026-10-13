@@ -530,7 +530,7 @@ func _mourir() -> void:
 		if randf() < 0.45:
 			bb["objets"].append(Objets.creer("oeuf", Objets.tirer_rarete([0.1, 0.45, 0.3, 0.12, 0.03])))
 		Depouille.creer(get_parent(), global_position, bb)
-	elif not invoque:
+	elif not invoque and not Heros.en_epreuve:
 		var b := Objets.butin_monstre(type)
 		if b["or"] > 0 or not b["objets"].is_empty():
 			Depouille.creer(get_parent(), global_position + Vector3(randf_range(-0.5, 0.5), 0, randf_range(-0.5, 0.5)), b)

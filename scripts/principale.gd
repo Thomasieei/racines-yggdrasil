@@ -22,6 +22,7 @@ var joy: Control
 ## Passage d'une carte à l'autre (portail, mort) : on recharge la scène avec la carte demandée.
 static var carte_suivante := ""
 static var sans_intro_suivante := false
+static var sac_suivant: Sac              ## le sac suit le joueur d'une carte à l'autre (pas à la mort)
 var monde: Node3D
 
 var chargement: CanvasLayer
@@ -67,9 +68,13 @@ func _construire() -> void:
 		carte = carte_suivante
 	if carte == "donjon":
 		carte = "crypte"
+	Heros.en_epreuve = carte == "epreuve"
 	if carte == "crypte":
 		_environnement()
 		monde = Caverne.new()
+	elif carte == "epreuve":
+		_environnement()
+		monde = Epreuve.new()
 	else:
 		_environnement_surface()
 		monde = CarteSurface.new()
@@ -83,6 +88,19 @@ func _construire() -> void:
 	joueur.name = "Heros"
 	joueur.position = Vector3(14, 0.1, 22) if carte == "crypte" else CarteSurface.SANCTUAIRE + Vector3(0, 0.1, 0)
 	joueur.rotation.y = PI
+	if carte == "epreuve":
+		joueur.position = Epreuve.DEPART
+	elif carte == "surface" and Epreuve.sac_garde != null:
+		joueur.sac = Epreuve.sac_garde
+		joueur.sac_neuf = false
+		Epreuve.sac_garde = null
+		if not Epreuve.oeuf_garde.is_empty():
+			joueur.sac.ajouter(Epreuve.oeuf_garde)
+			Epreuve.oeuf_garde = {}
+	elif sac_suivant != null:
+		joueur.sac = sac_suivant
+		joueur.sac_neuf = false
+	sac_suivant = null
 	add_child(joueur)
 
 	# lumière portée par le héros : chaude, douce
@@ -137,6 +155,8 @@ func _construire() -> void:
 		sc.name = "Scenario"
 		add_child(sc)
 		sc.demarrer(self, joueur, hud, "--sans-intro" in args or sans_intro_suivante)
+	if carte == "epreuve":
+		monde.demarrer(self, joueur, hud)
 	if hud:
 		var suivi := Node.new()
 		suivi.set_script(load("res://scripts/progression/suivi.gd"))
@@ -170,11 +190,21 @@ func _construire() -> void:
 	_capture_si_demandee()
 
 ## Freya ramène le héros au sanctuaire (le corps et l'équipement restent en bas : à venir).
+## L'œuf runique est brisé : on part seul dans l'épreuve ; le sac attend dehors.
+func lancer_epreuve(oeuf: Dictionary) -> void:
+	joueur.sac.retirer(oeuf)
+	Epreuve.oeuf_garde = oeuf
+	Epreuve.sac_garde = joueur.sac
+	sac_suivant = null
+	changer_carte("epreuve", true, false)
+
 func _apres_la_mort() -> void:
 	await get_tree().create_timer(4.5).timeout
 	changer_carte("surface", true)
 
-func changer_carte(nom: String, sans_intro := true) -> void:
+func changer_carte(nom: String, sans_intro := true, garder_sac := true) -> void:
+	if garder_sac and joueur and is_instance_valid(joueur) and not joueur.est_mort:
+		sac_suivant = joueur.sac
 	carte_suivante = nom
 	sans_intro_suivante = sans_intro
 	var voile := _voile()

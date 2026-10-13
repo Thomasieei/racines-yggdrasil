@@ -27,7 +27,7 @@ func _sur_evenement(nom: String, d: Dictionary) -> void:
 		"tue":
 			if d.get("joueur", false):
 				pr.compter("tues")
-				if d.get("elite", false) and not d.get("boss", false):
+				if d.get("elite", false) and not d.get("boss", false) and d.get("type", "") in ["jarl", "reine", "brokk"]:
 					pr.compter("elites")
 					var cle := "elite_" + str(d.get("type", ""))
 					if not pr.vu(cle):
@@ -59,9 +59,26 @@ func _sur_ramasse(_or: int, objets: Array, _origine: String) -> void:
 func _sur_sac() -> void:
 	if heros == null:
 		return
+	_fusion()
 	Profil.p().maximum("or_max", heros.sac.or_)
 	Profil.p().maximum("reliques_portees", heros.sac.reliques_portees())
 	Profil.p().maximum("niveau_mineur", heros.metier_mine["niveau"])
+
+## Trois fragments différents dans le sac : ils se rejoignent en un œuf runique.
+func _fusion() -> void:
+	var frag := {}
+	for o in heros.sac.objets:
+		if o.get("type", "") == "rune":
+			frag[o.get("numero", 0)] = o
+	if frag.size() < 3:
+		return
+	for o in frag.values():
+		heros.sac.objets.erase(o)
+	var oeuf := Objets.creer("oeuf_runique", "legendaire")
+	heros.sac.objets.append(oeuf)
+	heros.sac.change.emit.call_deferred()
+	if Jeu.hud and Jeu.hud.has_method("celebrer"):
+		Jeu.hud.celebrer.call_deferred(oeuf, "LES RUNES SE REJOIGNENT", "Œuf runique", "Quelque chose dort dedans. Il ne s'éveille que pour qui l'affronte seul.")
 
 func _sur_realisation(r: Dictionary) -> void:
 	if Jeu.hud and is_instance_valid(Jeu.hud) and Jeu.hud.has_method("annoncer_realisation"):
@@ -87,8 +104,11 @@ func _process(delta: float) -> void:
 		var g := Vector2(p.x - Caverne.GOUFFRE.x, p.z - Caverne.GOUFFRE.z)
 		var r := Vector2(g.x / Caverne.GOUFFRE_R.x, g.y / Caverne.GOUFFRE_R.y).length()
 		_abime = _abime + delta if r < 1.45 else 0.0
-		if _abime > 10.0 and pr.valeur("abime") == 0:
-			pr.compter("abime")
+		if _abime > 10.0:
+			_abime = -999.0
+			Jeu.evenement("abime", {"pos": p})
+			if pr.valeur("abime") == 0:
+				pr.compter("abime")
 		if p.distance_to(Caverne.LAC) < 15.0 and pr.valeur("lac") == 0:
 			pr.compter("lac")
 		var immobile: bool = heros.velocity.length() < 0.2 and heros.action == ""

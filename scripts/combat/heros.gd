@@ -33,6 +33,9 @@ var energie := 100.0
 var sac := Sac.new()
 var potions: int:
 	get: return sac.compter("potion")
+var sac_neuf := true                    ## faux quand le sac vient de la carte précédente
+var classe := ""                        ## voie de classe (le titre donne les compétences, pas l'arme)
+static var en_epreuve := false          ## épreuve draconique : ni arme, ni reliques, ni talents
 var ia := false                         ## joueur piloté par l'IA (bots) : ignore le clavier
 var nom_joueur := "Thomas"
 var hostiles: Array = []                ## héros que l'on combat (JcJ) : attaqués ou agresseurs
@@ -122,10 +125,12 @@ func _ready() -> void:
 	collision_layer = 4     # les monstres ne se bloquent pas sur le héros : séparation douce gérée par eux
 	collision_mask = 1
 	installer_modele(load(classe_modele), 1.0, CACHES_CHEVALIER if classe_modele == CHEVALIER else CACHES)
-	sac.ajouter(Objets.creer("potion", "commun", 3))
+	if sac_neuf:
+		sac.ajouter(Objets.creer("potion", "commun", 3))
 	sac.change.connect(_maj_arme)
 	sac.change.connect(_maj_stats)
 	if not ia:
+		classe = Profil.p().classe
 		Profil.p().change.connect(_maj_stats)
 	_maj_stats()
 	for id in COMPETENCES:
@@ -196,10 +201,22 @@ var _rempart_t := 0.0
 
 ## Bonus total d'une statistique : reliques portées, plus l'Arbre des Racines pour le joueur.
 func stat(nom: String) -> float:
-	var v := sac.bonus_relique(nom)
+	var v: float = Classes.fiche(classe)["stats"].get(nom, 0.0)
+	if en_epreuve and not ia:
+		return v
+	v += sac.bonus_relique(nom)
 	if not ia:
 		v += Profil.p().stat(nom)
 	return v
+
+## Fiche d'une compétence pour l'emplacement `id`, selon la classe.
+func competence(id: String) -> Dictionary:
+	var c: Dictionary = COMPETENCES[id].duplicate()
+	var r: Dictionary = Classes.fiche(classe)["remplace"]
+	if r.has(id):
+		c.merge(r[id], true)
+		c["de_classe"] = true
+	return c
 
 func _maj_stats() -> void:
 	var ratio := pv / pv_max if pv_max > 0.0 else 1.0
@@ -227,7 +244,7 @@ func _micro_pause(t: float) -> void:
 		Effets.micro_pause(get_tree(), t)
 
 func _maj_arme() -> void:
-	degats_arme = sac.arme.get("degats", 90) / 30.0 if not sac.arme.is_empty() else 3.0
+	degats_arme = sac.arme.get("degats", 90) / 30.0 if not sac.arme.is_empty() and not (en_epreuve and not ia) else 3.0
 
 ## Action canalisée (miner, ouvrir un coffre, fouiller un corps) : barre de progression,
 ## annulée si l'on bouge, si l'on est frappé ou si l'on lance un sort.
@@ -290,12 +307,15 @@ func _scene() -> Node:
 func _cout(id: String) -> float:
 	if id == "d" and stat("muninn") > 0.0:
 		return 0.0
-	return COMPETENCES[id]["cout"]
+	var c: float = competence(id)["cout"]
+	if id == "d":
+		c *= 1.0 - stat("esquive")
+	return c
 
 func _recharge(id: String) -> float:
 	if id == "d" and stat("muninn") > 0.0:
 		return 0.8
-	return COMPETENCES[id]["cd"] * maxf(0.4, 1.0 - stat("recharge"))
+	return competence(id)["cd"] * maxf(0.4, 1.0 - stat("recharge"))
 
 ## Appelé par le HUD ou le clavier. `dir` = direction visée (null = automatique vers l'ennemi proche).
 func lancer(id: String, dir = null) -> bool:
@@ -331,7 +351,11 @@ func lancer(id: String, dir = null) -> bool:
 	cds[id] = _recharge(id)
 	energie -= _cout(id)
 	energie_change.emit(energie, energie_max)
-	match id:
+	var de_classe: bool = Classes.fiche(classe)["remplace"].has(id)
+	match id if not de_classe else classe + ":" + id:
+		"souffle:q": _souffle(d)
+		"ecailles:r": _carapace()
+		"ailes:w": _envol(d)
 		"q": _fendoir(d)
 		"w": _bond(d)
 		"e": _ruee_incantation(d)
@@ -386,7 +410,91 @@ func _bond(d: Vector3) -> void:
 	jouer("Jump_Full_Short", 0.06, 1.35, 0.6)
 	Sons.jouer("tissu", global_position, -4.0)
 
+# ---------------- compétences draconiques ----------------
+
+var _carapace_t := 0.0
+var _carapace_noeud: MeshInstance3D
+
+## Souffle ardent : long cône de feu, brûlure 3 s.
+func _souffle(d: Vector3) -> void:
+	regarder(d)
+	jouer("2H_Melee_Attack_Chop", 0.08, 1.3, 0.55)
+	Sons.jouer("activation", global_position, -2.0, 0.7)
+	Telegraphe.creer(_scene(), Telegraphe.Forme.CONE, global_position, d, 6.0, 1.1, 0.28, Color(1.0, 0.5, 0.15))
+	await get_tree().create_timer(0.2).timeout
+	if est_mort:
+		return
+	var o := global_position + Vector3(0, 1.1, 0) + d * 0.6
+	for i in 3:
+		Effets.etincelles(_scene(), o, d + Vector3(0, 0.05, 0), Color(1.0, 0.55 - i * 0.12, 0.15), 22, 10.0 + i * 2.0, "fire_01.png" if i == 0 else "spark_04.png", 0.6 - i * 0.12)
+	Effets.flash_lumiere(_scene(), o + d * 2.0, Color(1.0, 0.5, 0.2), 4.0, 8.0, 0.35)
+	for e in cibles_touchables():
+		if Zones.dans_cone(e.global_position, global_position, d, 6.0, 1.1, e.rayon):
+			e.recevoir({"montant": _degats(30.0, e), "source": self, "critique": _crit(0.1)})
+			_bruler(e, _degats(30.0, e) * 0.6, 3.0)
+
+## Dégâts sur la durée (feu) : quelques petits coups espacés.
+func _bruler(e: Node, total: float, duree: float) -> void:
+	var n := int(duree / 0.5)
+	for i in n:
+		await get_tree().create_timer(0.5).timeout
+		if not is_instance_valid(self) or not is_instance_valid(e) or e.est_mort:
+			return
+		e.recevoir({"montant": total / n, "source": self})
+		Effets.etincelles(_scene(), e.global_position + Vector3(0, 1.0, 0), Vector3.UP, Color(1.0, 0.5, 0.15), 5, 2.0, "spark_04.png", 0.3)
+
+## Carapace d'écailles : 4 s de protection, renvoie une part des coups.
+func _carapace() -> void:
+	jouer("Block", 0.08, 1.0, 0.5)
+	_carapace_t = 4.0
+	Sons.jouer("metal", global_position, 0.0, 0.6)
+	Effets.onde(_scene(), global_position, 2.4, Color(0.4, 1.0, 0.75))
+	if _carapace_noeud == null:
+		var m := MeshInstance3D.new()
+		var sp := SphereMesh.new()
+		sp.radius = 1.05
+		sp.height = 2.3
+		m.mesh = sp
+		var mat := StandardMaterial3D.new()
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.albedo_color = Color(0.25, 0.9, 0.6, 0.18)
+		mat.disable_fog = true
+		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		m.material_override = mat
+		m.position.y = 1.0
+		add_child(m)
+		_carapace_noeud = m
+	_carapace_noeud.visible = true
+
+## Envol : grand bond, anneau de feu à l'arrivée.
+func _envol(d: Vector3) -> void:
+	var dist := Zones.distance_libre(get_world_3d(), global_position, d, 11.0, [get_rid()])
+	regarder(d)
+	action = "saut"
+	_action_t = 0.0
+	_action = {"dep": global_position, "dir": d, "dist": dist, "duree": 0.75, "envol": true}
+	jouer("Jump_Full_Long", 0.06, 1.2, 0.8)
+	Sons.jouer("tissu", global_position, 0.0, 0.8)
+	Effets.poussiere(_scene(), global_position, 10, Color(0.7, 0.85, 1.0, 0.5))
+
+func _fin_envol() -> void:
+	action = ""
+	Effets.onde(_scene(), global_position, 3.8, Color(1.0, 0.55, 0.2))
+	Effets.flash_lumiere(_scene(), global_position, Color(1.0, 0.55, 0.2), 4.0, 8.0, 0.3)
+	Effets.etincelles(_scene(), global_position + Vector3(0, 0.3, 0), Vector3.UP, Color(1.0, 0.6, 0.2), 26, 7.0, "fire_01.png", 0.5)
+	Sons.jouer("atterrissage", global_position, 2.0, 0.8)
+	_camera_secousse(0.5)
+	for e in cibles_touchables():
+		if Zones.dans_cercle(e.global_position, global_position, 3.6, e.rayon):
+			e.recevoir({"montant": _degats(32.0, e), "source": self, "critique": _crit(0.1), "recul": 1.6})
+			_bruler(e, _degats(32.0, e) * 0.4, 2.0)
+
 func _fin_bond() -> void:
+	if _action.get("envol", false):
+		_fin_envol()
+		return
 	action = ""
 	Effets.onde(_scene(), global_position, 2.8, Color(1.0, 0.75, 0.4))
 	Effets.poussiere(_scene(), global_position, 12)
@@ -541,7 +649,12 @@ func recevoir(d: Dictionary) -> void:
 		_fin_canal(false)
 	if d.get("montant", 0.0) > 0.0 and invulnerable_t <= 0.0 and not est_mort:
 		_t_sans_coup = 0.0
-		var arm := minf(0.5, stat("armure"))
+		var arm := clampf(stat("armure"), -0.5, 0.5)
+		if _carapace_t > 0.0:
+			arm = maxf(arm, 0.0) + 0.6
+			var src2 = d.get("source", null)
+			if src2 != null and is_instance_valid(src2) and src2 is EntiteCombat and not d.get("reflet", false) and not src2.est_mort:
+				src2.recevoir({"montant": d["montant"] * 0.25, "source": self, "reflet": true})
 		var m: float = d["montant"] * (1.0 - arm)
 		# Dernier rempart : un coup mortel laisse à 1 PV, une fois toutes les 90 s
 		if m >= pv and stat("rempart") > 0.0 and _rempart_t <= 0.0:
@@ -554,7 +667,7 @@ func recevoir(d: Dictionary) -> void:
 			Effets.onde(_scene(), global_position, 3.5, Color(0.6, 1.0, 0.5))
 			Effets.nombre(_scene(), global_position, "Dernier rempart !", Color("#B8FF9A"), true, "etat")
 			return
-		if arm > 0.0:
+		if arm != 0.0:
 			d = d.duplicate()
 			d["montant"] = m
 	super.recevoir(d)
@@ -612,6 +725,10 @@ func _physics_process(delta: float) -> void:
 		return
 	energie = minf(energie_max, energie + regen_energie * (1.0 + stat("energie")) * delta)
 	_rempart_t = maxf(0.0, _rempart_t - delta)
+	if _carapace_t > 0.0:
+		_carapace_t -= delta
+		if _carapace_t <= 0.0 and _carapace_noeud:
+			_carapace_noeud.visible = false
 	_t_sans_coup += delta
 	if _t_sans_coup > 6.0 and pv < pv_max:
 		var rg := stat("regen")
@@ -635,7 +752,7 @@ func _physics_process(delta: float) -> void:
 			velocity.y = 0
 			move_and_slide()
 			if modele:
-				modele.position.y = sin(k * PI) * 1.6
+				modele.position.y = sin(k * PI) * (3.0 if _action.get("envol", false) else 1.6)
 			if k >= 1.0:
 				if modele:
 					modele.position.y = 0.0

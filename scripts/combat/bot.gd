@@ -155,7 +155,7 @@ func _objet_interessant(rayon: float) -> Node3D:
 	for o in get_tree().get_nodes_in_group("interactif"):
 		if not o is Node3D or not o.has_method("disponible") or not o.disponible():
 			continue
-		if o is Pnj or o is Heros:
+		if o is Pnj or o is Heros or o is RuneDraconique:
 			continue
 		if o is Filon and h.metier_mine["niveau"] < Filon.TYPES[o.type]["niveau"]:
 			continue

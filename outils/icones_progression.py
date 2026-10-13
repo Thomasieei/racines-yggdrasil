@@ -107,3 +107,30 @@ for s, corps in R.items():
         txt = svg(corps).replace("</defs>", gemme(r) + "</defs>")
         open(os.path.join(RACINE, "icones_reliques", f"{s}_{r}.svg"), "w").write(txt)
 print(len(T), "talents,", len(B), "boutons,", len(R) * len(RAR), "reliques")
+
+# ---- voies draconiques : compétences, emblèmes, fragments, œuf runique ----
+FEU = '<linearGradient id="feu" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#8E1520"/><stop offset="0.45" stop-color="#FF7A2E"/><stop offset="1" stop-color="#FFE9A0"/></linearGradient>'
+ECAILLE = '<linearGradient id="ecaille" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#C8FFE6"/><stop offset="0.5" stop-color="#4FC898"/><stop offset="1" stop-color="#1E6A54"/></linearGradient>'
+CIEL = '<linearGradient id="ciel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F2FAFF"/><stop offset="0.5" stop-color="#8FCBFF"/><stop offset="1" stop-color="#3A7BC8"/></linearGradient>'
+RUNE = '<radialGradient id="rune" cx="0.5" cy="0.45" r="0.6"><stop offset="0" stop-color="#F8E8FF"/><stop offset="0.5" stop-color="#B07CFF"/><stop offset="1" stop-color="#4A1E8A"/></radialGradient>'
+def svg2(corps):
+    return svg(corps).replace("</defs>", FEU + ECAILLE + CIEL + RUNE + "</defs>")
+D = {}
+D["souffle"] = forme("M18 64 Q50 30 112 20 Q96 44 116 60 Q94 66 112 92 Q60 88 18 64 Z", "url(#feu)") + \
+    forme("M10 56 Q4 64 10 72 L24 64 Z", "url(#or)", 4) + reflet("M40 58 Q70 42 100 34", 4)
+D["carapace"] = forme("M64 12 L104 30 L104 72 Q100 100 64 118 Q28 100 24 72 L24 30 Z", "url(#ecaille)") + \
+    trait("M64 12 V118 M24 50 Q64 70 104 50 M30 84 Q64 102 98 84", "#1E5A48", 4) + reflet("M34 34 L58 22")
+D["envol"] = forme("M64 70 Q40 30 8 24 Q26 44 22 56 Q8 56 12 70 Q30 64 40 76 Q30 86 36 96 Q52 84 64 92 Q76 84 92 96 Q98 86 88 76 Q98 64 116 70 Q120 56 106 56 Q102 44 120 24 Q88 30 64 70 Z", "url(#ciel)") + \
+    forme("M54 104 Q64 92 74 104 Q70 116 64 120 Q58 116 54 104 Z", "url(#feu)", 4)
+D["classe_souffle"] = forme("M64 8 Q100 40 96 76 Q92 108 64 120 Q36 108 32 76 Q28 40 64 8 Z", "url(#feu)") + \
+    forme("M64 44 Q80 64 76 82 Q72 96 64 100 Q56 96 52 82 Q48 64 64 44 Z", "url(#or)", 4)
+D["classe_ecailles"] = forme("M64 10 L110 34 L110 78 Q104 106 64 120 Q24 106 18 78 L18 34 Z", "url(#ecaille)") + \
+    forme("M44 50 Q64 40 84 50 Q80 66 64 70 Q48 66 44 50 Z", "url(#or)", 4) + forme("M44 76 Q64 66 84 76 Q80 92 64 96 Q48 92 44 76 Z", "url(#or)", 4)
+D["classe_ailes"] = D["envol"].replace("url(#feu)", "url(#or)")
+D["fragment"] = forme("M50 10 L96 28 L110 74 L72 118 L26 96 L18 44 Z", "url(#nuit)") + \
+    trait("M64 30 V94 M64 46 L82 34 M64 62 L46 50 M64 78 L82 66", "url(#rune)", 6)
+D["oeuf_runique"] = forme("M64 8 Q104 40 104 78 A40 40 0 0 1 24 78 Q24 40 64 8 Z", "url(#rune)") + \
+    trait("M64 34 V96 M64 50 L80 40 M64 66 L48 56 M64 82 L80 72", "url(#or)", 5) + reflet("M42 46 Q48 30 60 22", 5)
+for k, v in D.items():
+    open(os.path.join(RACINE, "icones_sorts", k + ".svg"), "w").write(svg2(v))
+print(len(D), "icônes draconiques")
