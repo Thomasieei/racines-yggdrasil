@@ -82,9 +82,12 @@ func _rafraichir() -> void:
 	for x in _contenu.get_children():
 		x.queue_free()
 	var sac: Sac = heros.sac
-	var titre := "Ton coffre" if mode == "coffre" else "Halvard, marchand"
+	var titre: String = {"coffre": "Ton coffre", "marchand": "Halvard, marchand", "forge": "Ingrid, forgeronne"}[mode]
 	texte(titre, 26, ENCRE, Vector2(24, 16), _contenu, false)
-	texte("Ce qui dort ici ne se perd jamais, même si tu tombes." if mode == "coffre" else "« Tout se vend, tout s'achète. Surtout ce que les morts n'emportent pas. »", 13, ENCRE2, Vector2(24, 50), _contenu, false)
+	var sous: String = {"coffre": "Ce qui dort ici ne se perd jamais, même si tu tombes.",
+		"marchand": "« Tout se vend, tout s'achète. Surtout ce que les morts n'emportent pas. »",
+		"forge": "« Rapporte-moi du minerai, je rendrai ta lame digne d'Yggdrasil. »"}[mode]
+	texte(sous, 13, ENCRE2, Vector2(24, 50), _contenu, false)
 	var x := neuf(UI + "rpg/buttonRound_brown.png", 10, Vector2(42, 42), Vector2(1004, 12), _contenu)
 	texte("✕", 18, Color("#FFF4DC"), Vector2(0, 8), x, true, 42, HORIZONTAL_ALIGNMENT_CENTER)
 	_clic(x, fermer)
@@ -94,9 +97,11 @@ func _rafraichir() -> void:
 		var o: Dictionary = sac.objets[i] if i < sac.objets.size() else {}
 		var pos := Vector2(24 + (i % 6) * (T + G), 110 + (i / 6) * (T + G))
 		_case(o, pos, func(): _depuis_sac(o))
-	texte("Touche un objet pour le %s." % ("ranger" if mode == "coffre" else "vendre"), 12, ENCRE2, Vector2(24, 412), _contenu, false)
+	texte("Touche un objet pour le %s." % {"coffre": "ranger", "marchand": "vendre", "forge": "l'équiper (armes de ta classe)"}[mode], 12, ENCRE2, Vector2(24, 412), _contenu, false)
 	if mode == "coffre":
 		_cote_coffre()
+	elif mode == "forge":
+		_cote_forge()
 	else:
 		_cote_marchand()
 
@@ -118,7 +123,105 @@ func _cote_coffre() -> void:
 		c["or"] -= n
 		heros.sac.ajouter_or(n), true)
 
+# ---------------- forge ----------------
+
+const FORGE_MAX := 10
+
+## Prix d'un niveau de forge : de l'or et du minerai, de plus en plus rare.
+static func prix_forge(n: int) -> Dictionary:
+	var m := "minerai_cuivre"
+	var q := 3 + n
+	if n > 3:
+		m = "minerai_fer"
+		q = 2 + n
+	if n > 6:
+		m = "minerai_argent"
+		q = n
+	if n > 8:
+		m = "minerai_or"
+		q = n - 3
+	return {"or": 60 * n * n, "minerai": m, "qte": q}
+
+func _stock(id: String) -> int:
+	var n := heros.sac.compter(id)
+	for o in Profil.p().coffre["objets"]:
+		if o["id"] == id:
+			n += o["qte"]
+	return n
+
+func _cote_forge() -> void:
+	var a: Dictionary = heros.sac.arme
+	texte("Arme équipée", 16, ENCRE, Vector2(420, 82), _contenu, false)
+	var carte := neuf(UI + "rpg/panel_beigeLight.png", 16, Vector2(600, 300), Vector2(420, 110), _contenu)
+	if a.is_empty():
+		texte("Tu te bats avec l'arme de départ de ta classe.", 15, ENCRE, Vector2(20, 24), carte, false)
+		texte("Équipe une arme trouvée dans le donjon pour la faire forger.", 13, ENCRE2, Vector2(20, 52), carte, false)
+		return
+	var n: int = a.get("forge", 0)
+	var c := Objets.couleur(a)
+	disque(Vector2(18, 18), 86, Color(0.08, 0.06, 0.05), carte)
+	image(a["icone"], Vector2(64, 64), Vector2(29, 29), carte)
+	texte(a["nom"] + ("  +%d" % n if n > 0 else ""), 20, c.darkened(0.3), Vector2(120, 22), carte, false, 460)
+	var deg := int(round(a["degats"] * (1.0 + 0.06 * n)))
+	texte("Dégâts %d" % deg, 15, ENCRE, Vector2(120, 54), carte, false)
+	# pastilles de forge
+	for i in FORGE_MAX:
+		var p := Panel.new()
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color("#E0A93A") if i < n else Color(0.55, 0.45, 0.32, 0.25)
+		sb.border_color = Color("#6B4C22")
+		sb.set_border_width_all(1)
+		sb.set_corner_radius_all(4)
+		p.add_theme_stylebox_override("panel", sb)
+		p.position = Vector2(120 + i * 24, 82)
+		p.size = Vector2(18, 10)
+		carte.add_child(p)
+	if n >= FORGE_MAX:
+		texte("Ingrid ne peut rien faire de plus : c'est une pièce de maître.", 14, Color("#2E6A2C"), Vector2(20, 130), carte, false)
+		return
+	var pf := prix_forge(n + 1)
+	var nom_m: String = Objets.MODELES[pf["minerai"]]["nom"]
+	var deg2 := int(round(a["degats"] * (1.0 + 0.06 * (n + 1))))
+	texte("Forger +%d : dégâts %d → %d" % [n + 1, deg, deg2], 16, ENCRE, Vector2(20, 128), carte, false)
+	var stock := _stock(pf["minerai"])
+	image(Objets.MODELES[pf["minerai"]]["icone"], Vector2(36, 36), Vector2(20, 160), carte)
+	texte("%s : %d / %d (sac + coffre)" % [nom_m, stock, pf["qte"]], 14, Color("#2E6A2C") if stock >= pf["qte"] else Color("#A04030"), Vector2(64, 168), carte, false)
+	image("res://assets/icones_objets/pieces_or.png", Vector2(36, 36), Vector2(20, 202), carte)
+	texte("Or : %d / %d" % [heros.sac.or_, pf["or"]], 14, Color("#2E6A2C") if heros.sac.or_ >= pf["or"] else Color("#A04030"), Vector2(64, 210), carte, false)
+	var possible: bool = stock >= pf["qte"] and heros.sac.or_ >= pf["or"]
+	var b := neuf(UI + "rpg/" + ("buttonLong_brown" if possible else "buttonLong_grey") + ".png", 12, Vector2(220, 46), Vector2(360, 236), carte)
+	texte("Forger +%d" % (n + 1), 17, Color("#FFF4DC"), Vector2(0, 12), b, true, 220, HORIZONTAL_ALIGNMENT_CENTER)
+	if possible:
+		_clic(b, func(): _forger(pf))
+
+func _forger(pf: Dictionary) -> void:
+	var reste: int = pf["qte"]
+	for o in heros.sac.objets.duplicate():
+		if reste > 0 and o["id"] == pf["minerai"]:
+			var k: int = mini(reste, o["qte"])
+			heros.sac.retirer(o, k)
+			reste -= k
+	for o in Profil.p().coffre["objets"].duplicate():
+		if reste > 0 and o["id"] == pf["minerai"]:
+			var k2: int = mini(reste, o["qte"])
+			o["qte"] -= k2
+			reste -= k2
+			if o["qte"] <= 0:
+				Profil.p().coffre["objets"].erase(o)
+	heros.sac.or_ -= pf["or"]
+	var a: Dictionary = heros.sac.arme
+	a["forge"] = a.get("forge", 0) + 1
+	a["valeur"] = int(a["valeur"] * 1.25)
+	Sons.jouer("metal", heros.global_position, 2.0, 0.8)
+	Sons.jouer("cloche", heros.global_position, -4.0, 1.4)
+	Jeu.notifier("%s passe à +%d !" % [a["nom"], a["forge"]], Color("#FFD34E"), a["icone"])
+	heros.sac.change.emit()
+
 func _depuis_sac(o: Dictionary) -> void:
+	if mode == "forge":
+		if o["type"] == "arme" and o.get("classe", "") == heros.classe:
+			heros.equiper_arme(o)
+		return
 	if mode == "marchand":
 		_vendre(o)
 		return

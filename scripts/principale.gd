@@ -559,6 +559,20 @@ func _test_boucle() -> void:
 		ui.ouvrir(joueur, "marchand")
 		await get_tree().create_timer(0.6).timeout
 		await _cap("marchand")
+		ui.fermer()
+		var arme := Objets.creer("grande_hache", "epique")
+		joueur.sac.ajouter(arme)
+		joueur.equiper_arme(arme)
+		joueur.sac.ajouter(Objets.creer("minerai_cuivre", "commun", 9))
+		joueur.sac.ajouter_or(500)
+		var fg := CanvasLayer.new()
+		fg.set_script(load("res://scripts/interface/comptoir_ui.gd"))
+		add_child(fg)
+		fg.ouvrir(joueur, "forge")
+		await get_tree().create_timer(0.5).timeout
+		fg._forger(fg.prix_forge(1))
+		await get_tree().create_timer(0.5).timeout
+		await _cap("forge")
 		printerr("TEST coffre=", Profil.p().coffre["objets"].size(), " sac=", joueur.sac.objets.size(), " or=", joueur.sac.or_)
 		get_tree().quit()
 

@@ -249,7 +249,7 @@ func _micro_pause(t: float) -> void:
 
 func _maj_arme() -> void:
 	var ok: bool = not sac.arme.is_empty() and not (en_epreuve and not ia) and sac.arme.get("classe", "") == classe
-	degats_arme = sac.arme.get("degats", 90) / 30.0 if ok else 3.0
+	degats_arme = sac.arme.get("degats", 90) * (1.0 + 0.06 * sac.arme.get("forge", 0)) / 30.0 if ok else 3.0
 
 ## L'arme tenue en main dépend de la classe (grande hache, bâton, épée et bouclier, dagues).
 func _armes_visibles() -> void:

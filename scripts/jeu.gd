@@ -14,6 +14,13 @@ static func ouvrir_butin(titre: String, contenu: Dictionary, h: Node, couleur :=
 	if hud and is_instance_valid(hud) and hud.has_method("ouvrir_butin"):
 		hud.ouvrir_butin(titre, contenu, h, couleur)
 
+## Canal du donjon (messages des autres aventuriers, annonces).
+static func chat(nom: String, texte: String) -> void:
+	if "--test-bots" in OS.get_cmdline_user_args():
+		printerr("CHAT ", nom, ": ", texte)
+	if hud and is_instance_valid(hud) and hud.has_method("chat"):
+		hud.chat(nom, texte)
+
 ## Événements de jeu pour les quêtes (« tue », « mine », « coffre », « elite », « boss »).
 static var ecouteurs: Array = []
 

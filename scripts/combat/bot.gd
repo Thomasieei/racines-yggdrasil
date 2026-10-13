@@ -33,10 +33,34 @@ var _lectures := {}
 var reel := true
 var afk := false
 
+var _t_chat := 0.0
+var _t_pause := 0.0
+var _salue := false
+var _ondule := randf() * TAU
+
+const BAVARDAGE := ["qq1 a vu le jarl ?", "les arbalétriers me saoulent", "jsuis à 2 potions", "le lac fait trop peur la nuit",
+	"y a un coffre violet vers les forges", "go ymir quand il pop ?", "brb", "mon dragon est nul mdr", "c'est quoi le meilleur talent ?",
+	"je cherche une relique bleue", "ça lag un peu non ?", "on se fait l'ossuaire ?", "trop de rampants au nid", "qui a un œuf à vendre",
+	"gg à celui qui a tué brokk", "jsuis full sac je remonte", "fais gaffe au camp du puits y a un pk"]
+const SALUTS := ["slt", "yo", "salut", "bonsoir tout le monde", "hello", "re"]
+const MORTS := ["rip", "nooon mon sac", "lag de fou", "jsuis mort bêtement", "rip mes reliques", "gg"]
+const PILLAGE := ["dsl c'est le jeu", "ton sac est à moi", "fallait pas rester seul", "pk inc"]
+
 func _ready() -> void:
 	_t_afk = randf_range(40.0, 140.0)
 	_t_pillage = randf_range(25.0, 60.0)
+	_t_chat = randf_range(30.0, 140.0)
 	h.mort.connect(_sur_mort)
+	if randf() < 0.45:
+		_dire.call_deferred(SALUTS.pick_random(), randf_range(2.0, 9.0))
+
+## Petit message dans le canal du donjon, avec un délai de frappe humain.
+func _dire(t: String, delai := 0.0) -> void:
+	if delai > 0.0:
+		await get_tree().create_timer(delai).timeout
+	if not is_instance_valid(h):
+		return
+	Jeu.chat(h.nom_joueur, t)
 
 # ---------------- outils ----------------
 
@@ -62,6 +86,15 @@ func _suivre(delta: float) -> bool:
 		_chemin_i += 1
 		return _chemin_i >= _chemin.size()
 	var d := v.normalized()
+	# un humain hésite parfois, et ne court jamais parfaitement droit
+	if _t_pause > 0.0:
+		_t_pause -= delta
+		h.entree = Vector2.ZERO
+		return false
+	if randf() < 0.0015:
+		_t_pause = randf_range(0.3, 1.4)
+	_ondule += delta * 1.3
+	d = (d + Vector3(-d.z, 0, d.x) * sin(_ondule) * 0.12).normalized()
 	h.entree = Vector2(d.x, d.z)
 	# coincé contre un obstacle : on recalcule, avec un pas de côté
 	_t_bloque += delta
@@ -171,6 +204,17 @@ func _physics_process(delta: float) -> void:
 	if h == null or not is_instance_valid(h) or h.est_mort:
 		return
 	_basculer_reel()
+	_t_chat -= delta
+	if _t_chat <= 0.0:
+		_t_chat = randf_range(70.0, 220.0)
+		if randf() < 0.6:
+			_dire(BAVARDAGE.pick_random())
+	if reel and not _salue:
+		var j := _joueur()
+		if j and h.global_position.distance_to(j.global_position) < 7.0 and not h.hostiles.has(j):
+			_salue = true
+			if randf() < 0.35:
+				_dire(["salut", "yo", "on farm ensemble ?", "tu fais la quête de bjorn ?", "o/"].pick_random(), randf_range(0.8, 2.5))
 	if not reel:
 		_simuler(delta)
 		return
@@ -346,6 +390,8 @@ func _pillage(delta: float) -> void:
 	tentation += j.sac.valeur() / 4000.0 * agressivite
 	if randf() < tentation:
 		h.declarer_hostile(j)
+		if randf() < 0.5:
+			_dire(PILLAGE.pick_random(), randf_range(0.5, 2.0))
 		etat = "combat"
 
 # ---------------- simulation hors champ ----------------
@@ -385,6 +431,7 @@ func _simuler(delta: float) -> void:
 	if _t_simu > 0.0:
 		return
 	_t_simu = 1.0
+	h.soigner(h.pv_max * 0.012)   # entre deux combats, on souffle un peu
 	if objectif.is_empty() or _chemin_i >= _chemin.size():
 		if objectif.get("genre", "") == "camp":
 			_combat_simule()
@@ -440,6 +487,8 @@ func _combat_simule() -> void:
 
 func _sur_mort(_e) -> void:
 	etat = "mort"
+	if reel and randf() < 0.7:
+		_dire(MORTS.pick_random(), randf_range(1.5, 4.0))
 	h.entree = Vector2.ZERO
 	if not reel:
 		h.modele.visible = false

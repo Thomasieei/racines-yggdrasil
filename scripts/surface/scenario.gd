@@ -82,7 +82,12 @@ func _pnj_et_monstres() -> void:
 		ui.ouvrir(h, "marchand"))
 	CoffrePerso.creer.call_deferred(principale, Vector3(140.5, 0, 41.5), 200.0)
 	var f := _pnj("forgeron", "Ingrid", "Forgeronne", Vector3(117.2, 0, 30.2), 240.0)
-	f.marqueur = "?"
+	f.marqueur = "!"
+	f.activer_parole(func(h):
+		var ui := CanvasLayer.new()
+		ui.set_script(load("res://scripts/interface/comptoir_ui.gd"))
+		principale.add_child(ui)
+		ui.ouvrir(h, "forge"))
 	# clairière : trois rampants enterrés, autour du chemin
 	var c := CarteSurface.CLAIRIERE
 	for d in [Vector3(-2.5, 0, -3.0), Vector3(3.5, 0, 1.5), Vector3(-1.0, 0, 4.5)]:

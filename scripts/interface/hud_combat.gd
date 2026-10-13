@@ -441,7 +441,7 @@ func _chercher_action() -> void:
 
 func notifier(t: String, couleur := Color.WHITE, icone := "") -> void:
 	var n := Control.new()
-	n.position = Vector2(1280 - 330, 170)
+	n.position = Vector2(1280 - 330, 188)
 	n.size = Vector2(316, 30)
 	n.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	racine.add_child(n)
@@ -459,20 +459,31 @@ func notifier(t: String, couleur := Color.WHITE, icone := "") -> void:
 	if icone != "":
 		image(icone, Vector2(26, 26), Vector2(4, 2), n)
 		x = 34.0
-	var lt := texte(t, 14, couleur, Vector2(x, 5), n, true, 316 - x - 8, HORIZONTAL_ALIGNMENT_RIGHT)
-	# message long : sur deux lignes plutôt que coupé au bord de l'écran
-	if ThemeDB.fallback_font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x > 316 - x - 12:
-		lt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		lt.size = Vector2(316 - x - 8, 40)
-		fond.size.y = 48
-		n.size.y = 48
+	# message long : coupé en deux lignes au mot le plus proche du milieu
+	var largeur := 316.0 - x - 12.0
+	var tt := t
+	if ThemeDB.fallback_font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x > largeur:
+		var mi := t.length() / 2
+		var coupe := -1
+		for k in range(0, mi):
+			if mi + k < t.length() and t[mi + k] == " ":
+				coupe = mi + k
+				break
+			if mi - k > 0 and t[mi - k] == " ":
+				coupe = mi - k
+				break
+		if coupe > 0:
+			tt = t.substr(0, coupe) + "\n" + t.substr(coupe + 1)
+			fond.size.y = 50
+			n.size.y = 50
+	texte(tt, 14, couleur, Vector2(x, 5), n, true, 316 - x - 8, HORIZONTAL_ALIGNMENT_RIGHT)
 	_notes.push_front({"n": n, "t": 0.0})
 	if _notes.size() > 6:
 		var vieux = _notes.pop_back()
 		vieux["n"].queue_free()
 
 func _maj_notes(delta: float) -> void:
-	var y := 170.0
+	var y := 188.0
 	for e in _notes.duplicate():
 		e["t"] += delta
 		var n: Control = e["n"]
@@ -482,6 +493,57 @@ func _maj_notes(delta: float) -> void:
 			n.queue_free()
 			_notes.erase(e)
 		y += n.size.y + 4.0
+
+# ---------- minuteur (fermeture du donjon) ----------
+
+var _minuteur: Label
+
+func regler_minuteur(t: String, couleur: Color) -> void:
+	if _minuteur == null:
+		_minuteur = texte("", 14, couleur, Vector2(1116, 160), null, true, 150, HORIZONTAL_ALIGNMENT_CENTER)
+	_minuteur.text = t
+	_minuteur.add_theme_color_override("font_color", couleur)
+
+# ---------- canal du donjon ----------
+
+var _canal: VBoxContainer
+var _canal_lignes: Array = []
+
+func chat(nom: String, t: String) -> void:
+	if _canal == null:
+		_canal = VBoxContainer.new()
+		_canal.position = Vector2(16, 162)
+		_canal.size = Vector2(380, 120)
+		_canal.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_canal.add_theme_constant_override("separation", 1)
+		racine.add_child(_canal)
+	var l := RichTextLabel.new()
+	l.bbcode_enabled = true
+	l.fit_content = true
+	l.scroll_active = false
+	l.autowrap_mode = TextServer.AUTOWRAP_OFF
+	l.custom_minimum_size = Vector2(380, 18)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	l.add_theme_font_size_override("normal_font_size", 13)
+	l.add_theme_constant_override("outline_size", 4)
+	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	if nom == "":
+		l.text = "[color=#9AA3B8][i]%s[/i][/color]" % t
+	else:
+		var c := Color.from_hsv(float(hash(nom) % 360) / 360.0, 0.45, 1.0)
+		l.text = "[color=#%s]%s[/color] [color=#E8E4DA]%s[/color]" % [c.to_html(false), nom, t]
+	_canal.add_child(l)
+	_canal_lignes.append({"l": l, "t": 0.0})
+	if _canal_lignes.size() > 5:
+		_canal_lignes.pop_front()["l"].queue_free()
+
+func _maj_canal(delta: float) -> void:
+	for e in _canal_lignes.duplicate():
+		e["t"] += delta
+		e["l"].modulate.a = clampf((14.0 - e["t"]) / 2.0, 0.0, 1.0)
+		if e["t"] > 14.0:
+			e["l"].queue_free()
+			_canal_lignes.erase(e)
 
 func _maj_badge() -> void:
 	if _badge == null:
@@ -586,6 +648,7 @@ func _process(delta: float) -> void:
 	if heros:
 		_chercher_action()
 		_maj_notes(delta)
+		_maj_canal(delta)
 	if heros == null:
 		return
 	# traînée de vie

@@ -60,6 +60,9 @@ const QUETES := [
 	{"id": "boss", "titre": "Le Roi sous la montagne", "texte": "Quand Ymir se lève, tout l'étage tremble. Aide à l'abattre.", "evt": "tue", "filtre": "boss", "but": 1, "or": 1200, "oeuf": "epique"},
 ]
 
+const DUREE_DONJON := 20.0 * 60.0  ## une descente dure 20 min : après, la montagne se referme
+var _fermeture := DUREE_DONJON
+var _alertes := {}
 const DELAI_BOSS := 180.0         ## premier réveil d'Ymir (prototype : 3 min ; en ligne : heure fixe)
 const ARENE_BOSS := Vector3(30, 0, -60)
 
@@ -76,11 +79,16 @@ const RAYON_DISCRET := 30.0        ## un camp ne se repeuple pas si un joueur es
 var _camps := {}
 var nav: NavCaverne
 
-## Aventuriers pilotés par l'IA (4 à 7) : pseudo, classe, tempérament (agressivité).
+## Aventuriers pilotés par l'IA (4 à 7) : pseudo, modèle, tempérament (agressivité).
+## Ils ne doivent jamais « sentir le bot » : pseudos variés, apparences et classes différentes,
+## arrivées étalées dans le temps, jamais tous au même endroit ni collés au joueur.
 const BOTS := [
 	["Ragnhild", "chevalier", 0.05], ["xX_Ulfr_Xx", "barbare", 0.55], ["Leif.le.Roux", "chevalier", 0.15],
 	["Astrid_77", "chevalier", 0.1], ["SkaldNoir", "barbare", 0.4], ["Bjarki", "chevalier", 0.25],
-	["Freydis", "barbare", 0.08], ["Toki42", "chevalier", 0.7],
+	["Freydis", "barbare", 0.08], ["Toki42", "chevalier", 0.7], ["Kvasir_FR", "barbare", 0.2],
+	["lolo.thor", "chevalier", 0.12], ["Drakkar83", "barbare", 0.45], ["Maëlys", "chevalier", 0.05],
+	["sniperwolf13", "barbare", 0.6], ["Hrolfr", "chevalier", 0.3], ["nono_viking", "barbare", 0.18],
+	["Eir.", "chevalier", 0.02], ["MjolnirKid", "barbare", 0.35],
 ]
 var _horloge := 0.0
 var _lod_t := 0.0
@@ -147,7 +155,7 @@ func demarrer(p: Node, h: Heros, hd: CanvasLayer) -> void:
 		_test_runes()
 	if "--test-jcj" in OS.get_cmdline_user_args():
 		_test_jcj()
-	hud.regler_titre("Étage 1 · Crypte des nains", "Donjon du jour · se referme dans 14:52")
+	hud.regler_titre("Étage 1 · Crypte des nains", "Donjon du jour")
 	recit.quete("Le donjon du jour", "Trouve Bjorn au camp des Égarés (est de la caverne)")
 	await get_tree().create_timer(1.5).timeout
 	if not Profil.p().vu("tuto_donjon"):
@@ -231,6 +239,39 @@ func _maj_boss(delta: float) -> void:
 	if _boss_t <= 0.0:
 		_reveiller_boss()
 
+## Le donjon se referme : compte à rebours sous la minicarte, alertes, puis éboulement.
+## Qui n'a pas pris une racine de retour reste sous la montagne… avec son sac.
+func _maj_fermeture(delta: float) -> void:
+	if heros.est_mort:
+		return
+	_fermeture -= delta
+	var m := int(maxf(_fermeture, 0.0)) / 60
+	var sec := int(maxf(_fermeture, 0.0)) % 60
+	var coul := Color("#EBDDBB") if _fermeture > 300.0 else (Color("#FFB04A") if _fermeture > 60.0 else Color("#FF5A4A"))
+	if _fermeture <= 60.0 and int(_fermeture * 2.0) % 2 == 0:
+		coul = coul.lightened(0.4)
+	if hud.has_method("regler_minuteur"):
+		hud.regler_minuteur("Fermeture %d:%02d" % [m, sec], coul)
+	for a in [[300.0, "Le donjon se referme dans 5 minutes", "Rejoins une racine de retour (camp des Égarés, camp du Puits)"],
+			[60.0, "Plus qu'une minute !", "Sans racine de retour, tout ton sac restera sous la montagne"],
+			[10.0, "La montagne s'effondre…", "Cours !"]]:
+		if _fermeture <= a[0] and not _alertes.has(a[0]):
+			_alertes[a[0]] = true
+			recit.bandeau(a[1], a[2], Color("#FF9C8A"))
+			Sons.jouer("coup_lourd", heros.global_position, 2.0, 0.5)
+			var cam := get_viewport().get_camera_3d()
+			if cam and cam.has_method("secouer"):
+				cam.secouer(0.6)
+	if _fermeture <= 10.0 and randf() < delta * 6.0:
+		Effets.poussiere(principale, heros.global_position + Vector3(randf_range(-6, 6), 0, randf_range(-6, 6)), 12, Color(0.5, 0.45, 0.4, 0.7))
+	if _fermeture <= 0.0:
+		recit.bandeau("Le donjon s'est refermé", "Ton sac reste sous la montagne. Freya te ramène.", Color("#FF6A4A"))
+		var cam2 := get_viewport().get_camera_3d()
+		if cam2 and cam2.has_method("secouer"):
+			cam2.secouer(1.5)
+		heros.invulnerable_t = 0.0
+		heros.recevoir({"montant": 1e9})
+
 func _reveiller_boss() -> void:
 	var b := Draugr.new()
 	b.configurer("roi")
@@ -248,6 +289,9 @@ func _reveiller_boss() -> void:
 		cam.secouer(1.2)
 	if hud.minicarte:
 		hud.minicarte.lieux.append({"c": Vector2(ARENE_BOSS.x, ARENE_BOSS.z), "genre": "elite"})
+	var bavards := get_tree().get_nodes_in_group("bot_cerveau")
+	if not bavards.is_empty():
+		bavards.pick_random()._dire(["ymir est up !!", "YMIR go go go", "qui vient pour le boss ?", "le roi est réveillé"].pick_random(), randf_range(1.5, 4.0))
 
 # ---------------- runes draconiques ----------------
 ## Trois fragments, trois façons de les trouver, rien sur la carte :
@@ -314,27 +358,49 @@ func _lancer_bots() -> void:
 	var noms := BOTS.duplicate()
 	noms.shuffle()
 	var n := randi_range(4, 7)
-	# deux qui arrivent avec le joueur (on les voit tout de suite), les autres déjà dans la grotte
-	var departs: Array = [Vector3(10, 0, 12), Vector3(18, 0, 16)]
-	var ailleurs: Array = [Caverne.CAMP, Caverne.PUITS, Vector3(-20, 0, -40), Vector3(40, 0, -100), Vector3(-60, 0, -10), Vector3(0, 0, -70), Vector3(60, 0, -60)]
-	ailleurs.shuffle()
-	for i in n:
-		var pos: Vector3 = departs[i] if i < departs.size() else ailleurs[(i - departs.size()) % ailleurs.size()]
-		_creer_bot(noms[i], pos, i == 3)
-		await get_tree().create_timer(0.35).timeout
+	# quelques-uns sont déjà loin dans la grotte, les autres arrivent plus tard, un par un
+	var loin: Array = [Vector3(-20, 0, -40), Vector3(40, 0, -100), Vector3(-60, 0, -10), Vector3(0, 0, -78),
+		Vector3(60, 0, -60), Vector3(-90, 0, -60), Vector3(55, 0, -130), Vector3(-30, 0, -80), Vector3(-75, 0, 10)]
+	loin.shuffle()
+	var deja := randi_range(2, 3)
+	var k := 0
+	for i in deja:
+		while k < loin.size() and loin[k].distance_to(heros.global_position) < 45.0:
+			k += 1
+		_creer_bot(noms[i], loin[k % loin.size()], i == 1)
+		k += 1
+		await get_tree().create_timer(0.4).timeout
+	for i in range(deja, n):
+		await get_tree().create_timer(randf_range(25.0, 150.0)).timeout
+		if not is_inside_tree():
+			return
+		_arrivee(noms[i])
+
+## Un aventurier « entre dans le donjon » par un point d'arrivée éloigné du joueur.
+func _arrivee(fiche: Array) -> void:
+	var pts: Array = Caverne.ARRIVEES.filter(func(p): return p.distance_to(heros.global_position) > 30.0)
+	if pts.is_empty():
+		pts = [Vector3(-60, 0, -10)]
+	_creer_bot(fiche, pts.pick_random() + Vector3(randf_range(-4, 4), 0, randf_range(-4, 4)))
+	if randf() < 0.5:
+		Jeu.chat("", "%s est entré dans le donjon" % fiche[0])
 
 func _creer_bot(fiche: Array, pos: Vector3, avec_dragon := false) -> Bot:
 	var b := Heros.new()
 	b.ia = true
 	b.nom_joueur = fiche[0]
 	b.classe_modele = Heros.CHEVALIER if fiche[1] == "chevalier" else Heros.MODELE
+	# certains ont déjà trouvé une voie draconique (avec l'arme qui va avec)
+	if randf() < 0.3:
+		b.classe = Classes.DRACONIQUES.pick_random()
 	b.name = "Bot_" + str(fiche[0]).validate_node_name()
 	var c := nav.centre(nav.libre_pres(pos))
 	b.position = c + Vector3(randf_range(-0.4, 0.4), 0.1, randf_range(-0.4, 0.4))
 	principale.add_child(b)
 	b.add_to_group("interactif")
+	_teinter(b)
 	# équipement de départ : une arme, un peu d'or, des potions, parfois un dragon
-	var arme := Objets.creer("grande_hache", Objets.tirer_rarete([0.6, 0.32, 0.07, 0.01, 0]))
+	var arme := Objets.creer(Classes.fiche(b.classe)["arme"], Objets.tirer_rarete([0.6, 0.32, 0.07, 0.01, 0]))
 	b.sac.arme = arme
 	b.sac.ajouter_or(randi_range(20, 260))
 	b.sac.ajouter(Objets.creer("potion", "commun", randi_range(0, 2)))
@@ -357,6 +423,20 @@ func _creer_bot(fiche: Array, pos: Vector3, avec_dragon := false) -> Bot:
 	add_child(cerveau)
 	return cerveau
 
+## Chacun sa couleur de cape et de chapeau : deux aventuriers ne se ressemblent pas.
+func _teinter(b: Heros) -> void:
+	var teinte := Color.from_hsv(randf(), randf_range(0.35, 0.75), randf_range(0.55, 1.0))
+	for nom in ["Barbarian_Cape", "Barbarian_Hat", "Knight_Cape", "Knight_Helmet"]:
+		var m := b.modele.find_child(nom, true, false) as MeshInstance3D
+		if m == null:
+			continue
+		for k in m.mesh.get_surface_count():
+			var src = m.get_active_material(k)
+			if src is StandardMaterial3D:
+				var c: StandardMaterial3D = src.duplicate()
+				c.albedo_color = teinte if nom.ends_with("Cape") else teinte.lerp(Color.WHITE, 0.4)
+				m.set_surface_override_material(k, c)
+
 ## Un aventurier IA est tombé : il revient du sanctuaire un peu plus tard, les poches vides.
 func bot_mort(cerveau: Bot) -> void:
 	var fiche: Array = cerveau.get_meta("fiche")
@@ -368,7 +448,7 @@ func bot_mort(cerveau: Bot) -> void:
 		ancien.queue_free()
 	if not is_inside_tree():
 		return
-	_creer_bot(fiche, Caverne.ARRIVEES[randi() % Caverne.ARRIVEES.size()])
+	_arrivee(fiche)
 
 func _gardienne(pos: Vector3, nom: String, rot: float) -> void:
 	var g := Pnj.new()
@@ -471,6 +551,7 @@ func _process(_d: float) -> void:
 	if heros == null or not is_instance_valid(heros):
 		return
 	_maj_boss(_d)
+	_maj_fermeture(_d)
 	_lod_t -= _d
 	if _lod_t <= 0.0:
 		_lod_t = 0.4
@@ -490,7 +571,7 @@ func _process(_d: float) -> void:
 			if id == "camp" and not _vus.has("camp"):
 				recit.voix("Sigrun", "Pose ta hache, voyageur. Rien ne franchit ce cercle tant que je respire.", 4.5)
 		"crypte":
-			hud.regler_titre("Étage 1 · Crypte des nains", "Donjon du jour · se referme dans 14:52")
+			hud.regler_titre("Étage 1 · Crypte des nains", "Donjon du jour")
 		"antre", "trone", "enclume":
 			recit.bandeau(nom, "Élite — un coffre légendaire dort derrière lui", Color("#FF9A2E"))
 			hud.regler_titre("Étage 1 · " + nom, "Élite", Color("#FF9A2E"))
