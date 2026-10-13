@@ -35,7 +35,9 @@ Donjon d'extraction mobile (Godot 4.3, paysage). Un donjon du jour partagé, Fre
 17. **Voies draconiques** : aucune indication sur la carte. Freya n'en dit qu'un mot. Ceux qui trouvent les trois fragments de rune les voient se rejoindre en un œuf runique ; briser le sceau mène à une épreuve solo où l'équipement ne compte plus, puis au choix définitif entre trois pouvoirs incompatibles (Souffle, Écailles, Ailes), chacun avec sa force et sa faiblesse. C'est le titre de classe qui donne les compétences ; l'arme n'ajoute que de la puissance, et chaque classe n'en manie qu'une famille : grande hache (Berserker), bâton (Souffle), épée et bouclier (Écailles), dagues (Ailes).
 18. Mourir ramène au sanctuaire. Le sac suit le joueur d'une carte à l'autre, mais reste sur le corps à la mort.
 
-Pas encore branchés : menus du marchand et de la forge (la vente du sac marche près d'un marchand), vrai multijoueur en ligne.
+**La boucle d'extraction** : on descend, on pille, et l'on remonte **vivant** par une **racine de retour** (camp des Égarés ou camp du Puits, 5 s sans se faire toucher) avec tout son sac. Au Bourg, **ton coffre** garde à l'abri ce qu'on y range (rien ne s'y perd, même en mourant) et **Halvard** rachète le butin et vend des potions. Le sac et le coffre sont sauvegardés sur le téléphone.
+
+Pas encore branché : vrai multijoueur en ligne.
 
 Le bébé dragon est le Dragon Evolved de Quaternius (CC0, animé) et l'œuf un modèle à écailles de la banque d'assets (CC0), tous deux recolorés selon la rareté.
 

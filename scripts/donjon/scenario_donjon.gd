@@ -129,6 +129,9 @@ func demarrer(p: Node, h: Heros, hd: CanvasLayer) -> void:
 	Jeu.ecouteurs.append(_rune_evenement)
 	Heros.jcj_actif = true
 	_runes()
+	# racines de retour : l'extraction, dans les deux camps sûrs
+	PortailRetour.creer.call_deferred(principale, Caverne.CAMP + Vector3(5.5, 0, -4.5))
+	PortailRetour.creer.call_deferred(principale, Caverne.PUITS + Vector3(-4.5, 0, 5.0))
 	_minicarte()
 	if not "--sans-bots" in OS.get_cmdline_user_args():
 		_lancer_bots()
@@ -460,6 +463,8 @@ func _minicarte() -> void:
 		{"c": Vector2(Caverne.TRONE_REINE.x, Caverne.TRONE_REINE.z), "genre": "elite"},
 		{"c": Vector2(Caverne.ENCLUME_BROKK.x, Caverne.ENCLUME_BROKK.z), "genre": "elite"},
 		{"c": Vector2(Caverne.LAC.x, Caverne.LAC.z), "genre": "danger"},
+		{"c": Vector2(Caverne.CAMP.x + 5.5, Caverne.CAMP.z - 4.5), "genre": "retour"},
+		{"c": Vector2(Caverne.PUITS.x - 4.5, Caverne.PUITS.z + 5.0), "genre": "retour"},
 	]
 
 func _process(_d: float) -> void:

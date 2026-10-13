@@ -17,6 +17,8 @@ var obtenues := {}          ## id réalisation -> true
 var talents := {}           ## id talent -> rang
 var points_gagnes := 0
 var vus := {}
+var sac_sauve := {}         ## le sac du joueur (rechargé au lancement)
+var coffre := {"objets": [], "or": 0}   ## coffre personnel du Bourg : ce qui y dort ne se perd jamais
 var classe := ""            ## "" = Berserker ; "souffle", "ecailles", "ailes" = voies draconiques
 var _sale := false
 var _t_sauve := 0.0
@@ -141,6 +143,8 @@ func sauver(force := false) -> void:
 	c.set_value("p", "vus", vus)
 	c.set_value("p", "classe", classe)
 	c.set_value("p", "version", VERSION)
+	c.set_value("p", "sac", sac_sauve)
+	c.set_value("p", "coffre", coffre)
 	c.save(FICHIER)
 
 func _charger() -> void:
@@ -158,6 +162,8 @@ func _charger() -> void:
 	points_gagnes = c.get_value("p", "points", 0)
 	vus = c.get_value("p", "vus", {})
 	classe = c.get_value("p", "classe", "")
+	sac_sauve = c.get_value("p", "sac", {})
+	coffre = c.get_value("p", "coffre", {"objets": [], "or": 0})
 	if c.get_value("p", "version", 1) < VERSION:
 		# rééquilibrage : on recompte les réalisations avec les nouveaux paliers et on rend les talents
 		obtenues.clear()

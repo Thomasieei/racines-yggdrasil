@@ -22,6 +22,7 @@ var joy: Control
 ## Passage d'une carte à l'autre (portail, mort) : on recharge la scène avec la carte demandée.
 static var carte_suivante := ""
 static var sans_intro_suivante := false
+static var _sac_recharge := false
 static var sac_suivant: Sac              ## le sac suit le joueur d'une carte à l'autre (pas à la mort)
 var monde: Node3D
 
@@ -47,6 +48,10 @@ func _ready() -> void:
 	if sd and sd.has_method("preparer"):
 		await sd.preparer()
 	chargement.disparaitre()
+	if carte == "surface" and not extraction.is_empty():
+		_accueil_extraction()
+	if "--test-boucle" in OS.get_cmdline_user_args():
+		_test_boucle()
 	if "--test-progression" in OS.get_cmdline_user_args():
 		_test_progression()
 	if "--test-objets" in OS.get_cmdline_user_args():
@@ -100,6 +105,13 @@ func _construire() -> void:
 	elif sac_suivant != null:
 		joueur.sac = sac_suivant
 		joueur.sac_neuf = false
+	elif not _sac_recharge and not Profil.p().sac_sauve.is_empty() and not "--profil-neuf" in OS.get_cmdline_user_args():
+		# lancement du jeu : on retrouve le sac de la dernière partie
+		joueur.sac = Sac.depuis_dict(Profil.p().sac_sauve)
+		joueur.sac_neuf = joueur.sac.objets.is_empty() and joueur.sac.or_ == 0
+	_sac_recharge = true
+	if carte == "surface" and not extraction.is_empty():
+		joueur.position = CarteSurface.PORTAIL + Vector3(0, 0.1, 8)
 	sac_suivant = null
 	add_child(joueur)
 
@@ -190,6 +202,22 @@ func _construire() -> void:
 	_capture_si_demandee()
 
 ## Freya ramène le héros au sanctuaire (le corps et l'équipement restent en bas : à venir).
+## Extraction réussie depuis une racine de retour : on remonte avec tout le sac.
+static var extraction := {}
+
+func extraire() -> void:
+	extraction = {"valeur": joueur.sac.valeur(), "objets": joueur.sac.objets.size()}
+	Profil.p().compter("extractions")
+	changer_carte("surface", true)
+
+func _accueil_extraction() -> void:
+	var e := extraction
+	extraction = {}
+	await get_tree().create_timer(0.8).timeout
+	if hud and hud.has_method("celebrer"):
+		hud.celebrer({"rarete": "legendaire", "icone": "res://assets/icones_objets/pieces_or.png"}, "EXTRACTION RÉUSSIE",
+			"Butin rapporté : %d or" % e["valeur"], "Range-le dans ton coffre au Bourg : là, il ne se perd plus.")
+
 ## L'œuf runique est brisé : on part seul dans l'épreuve ; le sac attend dehors.
 func lancer_epreuve(oeuf: Dictionary) -> void:
 	joueur.sac.retirer(oeuf)
@@ -491,6 +519,48 @@ func _test_progression() -> void:
 	await get_tree().create_timer(0.6).timeout
 	await _cap("realisation")
 	get_tree().quit()
+
+func _test_boucle() -> void:
+	# extraction (dans la caverne) ou comptoir (en surface), selon la carte
+	await get_tree().create_timer(2.0 if carte == "crypte" else 0.3).timeout
+	if carte == "crypte":
+		joueur.invulnerable_t = 1e9
+		joueur.sac.ajouter(Objets.creer("minerai_or", "commun", 7))
+		joueur.sac.ajouter(Objets.creer("relique", "epique"))
+		var pr: Node = null
+		for n in get_tree().get_nodes_in_group("interactif"):
+			if n is PortailRetour:
+				pr = n
+		joueur.global_position = pr.global_position + Vector3(0, 0.1, 2.2)
+		await get_tree().create_timer(1.5).timeout
+		await _cap("retour")
+		pr.interagir(joueur)
+		await get_tree().create_timer(4.0).timeout
+		await _cap("retour_canal")
+	else:
+		await _cap("extraction")
+		joueur.global_position = Vector3(139, 0.1, 44)
+		await get_tree().create_timer(1.5).timeout
+		await _cap("comptoir_monde")
+		for n in get_tree().get_nodes_in_group("interactif"):
+			if n is CoffrePerso:
+				n.interagir(joueur)
+		await get_tree().create_timer(0.6).timeout
+		await _cap("coffre_perso")
+		for c in get_children():
+			if c.has_method("fermer") and c.get("mode") != null:
+				c._ranger_ressources()
+				await get_tree().create_timer(0.4).timeout
+				await _cap("coffre_range")
+				c.fermer()
+		var ui := CanvasLayer.new()
+		ui.set_script(load("res://scripts/interface/comptoir_ui.gd"))
+		add_child(ui)
+		ui.ouvrir(joueur, "marchand")
+		await get_tree().create_timer(0.6).timeout
+		await _cap("marchand")
+		printerr("TEST coffre=", Profil.p().coffre["objets"].size(), " sac=", joueur.sac.objets.size(), " or=", joueur.sac.or_)
+		get_tree().quit()
 
 func _cap(nom: String) -> void:
 	if DisplayServer.get_name() == "headless":

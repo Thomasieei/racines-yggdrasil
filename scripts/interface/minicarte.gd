@@ -69,7 +69,7 @@ func _dessiner() -> void:
 		var d := p - o
 		var dedans := d.length() < rayon_px - 8.0
 		if not dedans:
-			if l["genre"] not in ["sur", "portail", "elite"]:
+			if l["genre"] not in ["sur", "portail", "elite", "retour"]:
 				continue
 			p = o + d.normalized() * (rayon_px - 8.0)   # les lieux importants restent épinglés au bord
 		_icone(p, l["genre"], 1.0 if dedans else 0.75)
@@ -128,6 +128,12 @@ func _icone(p: Vector2, genre: String, alpha: float) -> void:
 			_dessin.draw_colored_polygon(e, Color(1.0, 0.85, 0.45, alpha))
 		"danger":
 			_dessin.draw_circle(p, 3.5, Color(0.85, 0.2, 0.15, alpha))
+		"retour":
+			# racine de retour : anneau doré et flèche vers le haut (extraction)
+			_dessin.draw_circle(p, 6.5, Color(0.12, 0.08, 0.03, alpha))
+			_dessin.draw_arc(p, 6.5, 0, TAU, 20, Color(1.0, 0.8, 0.4, alpha), 2.0, true)
+			_dessin.draw_colored_polygon(PackedVector2Array([p + Vector2(0, -4.5), p + Vector2(3.5, 0.5), p + Vector2(-3.5, 0.5)]), Color(1.0, 0.85, 0.5, alpha))
+			_dessin.draw_line(p + Vector2(0, 0), p + Vector2(0, 4), Color(1.0, 0.85, 0.5, alpha), 2.0)
 		"elite":
 			# couronne orange : un élite et son coffre
 			var cr := PackedVector2Array([p + Vector2(-7, 4), p + Vector2(-7, -3), p + Vector2(-3.5, 0), p + Vector2(0, -6), p + Vector2(3.5, 0), p + Vector2(7, -3), p + Vector2(7, 4)])

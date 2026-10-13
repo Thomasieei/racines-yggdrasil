@@ -18,6 +18,8 @@ const LISTE := [
 	{"id": "ymir", "cat": "Chasse", "nom": "Le roi est mort", "texte": "Participer à la chute d'Ymir.", "compteur": "boss", "but": 1, "pts": 5},
 	{"id": "duel", "cat": "Chasse", "nom": "Loi du plus fort", "texte": "Vaincre un autre aventurier dans le donjon.", "compteur": "jcj", "but": 1, "pts": 2},
 	# Exploration
+	{"id": "extraction_1", "cat": "Exploration", "nom": "Revenu vivant", "texte": "Remonter du donjon par une racine de retour.", "compteur": "extractions", "but": 1, "pts": 2},
+	{"id": "extraction_10", "cat": "Exploration", "nom": "Pilleur aguerri", "texte": "Réussir 10 extractions.", "compteur": "extractions", "but": 10, "pts": 3},
 	{"id": "pas_500", "cat": "Exploration", "nom": "Premiers pas", "texte": "Parcourir 1 km.", "compteur": "metres", "but": 1000, "pts": 1},
 	{"id": "pas_2000", "cat": "Exploration", "nom": "Arpenteur", "texte": "Parcourir 5 km.", "compteur": "metres", "but": 5000, "pts": 2},
 	{"id": "pas_10000", "cat": "Exploration", "nom": "Infatigable", "texte": "Parcourir 20 km.", "compteur": "metres", "but": 20000, "pts": 4},

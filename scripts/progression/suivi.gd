@@ -60,6 +60,9 @@ func _sur_sac() -> void:
 	if heros == null:
 		return
 	_fusion()
+	if not Heros.en_epreuve:
+		Profil.p().sac_sauve = heros.sac.vers_dict()
+		Profil.p()._marquer()
 	Profil.p().maximum("or_max", heros.sac.or_)
 	Profil.p().maximum("reliques_portees", heros.sac.reliques_portees())
 	Profil.p().maximum("niveau_mineur", heros.metier_mine["niveau"])

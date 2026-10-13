@@ -13,6 +13,21 @@ var arme: Dictionary = {}       ## arme équipée (vide = hache du Jarl de dépa
 var acolyte: Dictionary = {}    ## dragon équipé
 var reliques: Array = [{}, {}, {}, {}, {}, {}]   ## six emplacements de reliques
 
+## Sauvegarde du sac (le joueur le retrouve en relançant le jeu).
+func vers_dict() -> Dictionary:
+	return {"objets": objets.duplicate(true), "or": or_, "arme": arme.duplicate(true), "acolyte": acolyte.duplicate(true), "reliques": reliques.duplicate(true)}
+
+static func depuis_dict(d: Dictionary) -> Sac:
+	var s := Sac.new()
+	s.objets = d.get("objets", []).duplicate(true)
+	s.or_ = d.get("or", 0)
+	s.arme = d.get("arme", {}).duplicate(true)
+	s.acolyte = d.get("acolyte", {}).duplicate(true)
+	var r: Array = d.get("reliques", [])
+	for i in mini(6, r.size()):
+		s.reliques[i] = r[i]
+	return s
+
 func reliques_portees() -> int:
 	return reliques.filter(func(r): return not r.is_empty()).size()
 

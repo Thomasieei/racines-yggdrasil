@@ -74,7 +74,13 @@ func _pnj_et_monstres() -> void:
 	_pnj("garde", "Garde de Skjold", "", Vector3(123.4, 0, 19.6), 180.0, true)
 	_pnj("garde", "Garde de Skjold", "", Vector3(130.6, 0, 19.6), 180.0, true)
 	var m := _pnj("marchand", "Halvard", "Marchand", Vector3(137.2, 0, 44.6), 200.0)
-	m.marqueur = "?"
+	m.marqueur = "$"
+	m.activer_parole(func(h):
+		var ui := CanvasLayer.new()
+		ui.set_script(load("res://scripts/interface/comptoir_ui.gd"))
+		principale.add_child(ui)
+		ui.ouvrir(h, "marchand"))
+	CoffrePerso.creer.call_deferred(principale, Vector3(140.5, 0, 41.5), 200.0)
 	var f := _pnj("forgeron", "Ingrid", "Forgeronne", Vector3(117.2, 0, 30.2), 240.0)
 	f.marqueur = "?"
 	# clairière : trois rampants enterrés, autour du chemin
