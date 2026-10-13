@@ -111,6 +111,11 @@ func _ready() -> void:
 			demo.set_script(load("res://scripts/demo_combat.gd"))
 			add_child(demo)
 			demo.lancer(joueur, camera)
+		elif a == "--survol":
+			var sv := Node.new()
+			sv.set_script(load("res://scripts/survol.gd"))
+			add_child(sv)
+			sv.lancer.call_deferred(camera, hud)
 		elif a == "--demo=donjon":
 			var demo3 := Node.new()
 			demo3.set_script(load("res://scripts/demo_donjon.gd"))
@@ -246,8 +251,8 @@ func _capture_si_demandee() -> void:
 			# vue d'ensemble orthographique, nord en haut
 			var c2 := Camera3D.new()
 			c2.projection = Camera3D.PROJECTION_ORTHOGONAL
-			c2.size = 112.0 if carte == "surface" else 120.0
-			c2.position = Vector3(86, 120, 55) if carte == "surface" else Vector3(22, 120, -40)
+			c2.size = 112.0 if carte == "surface" else 200.0
+			c2.position = Vector3(86, 120, 55) if carte == "surface" else Vector3(-18, 160, -66)
 			c2.rotation_degrees.x = -90
 			add_child(c2)
 			c2.current = true

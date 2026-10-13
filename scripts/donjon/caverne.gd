@@ -16,13 +16,16 @@ const R := "res://assets/surface/ressources/"
 ## Contour de tout l'espace marchable (tunnel + caverne + alcôves), sens trigonométrique.
 ## La dernière arête (fermeture) passe sous l'arche de la crypte : pas de mur à cet endroit.
 const CONTOUR := [
-	Vector2(11.8, 0.6), Vector2(10.5, -6), Vector2(8, -12), Vector2(5, -18), Vector2(3.5, -24),
-	Vector2(-6, -29), Vector2(-18, -33), Vector2(-30, -40), Vector2(-37, -52), Vector2(-39, -64), Vector2(-34, -77),
-	Vector2(-22, -88), Vector2(-6, -95), Vector2(12, -96), Vector2(15, -106), Vector2(23, -106), Vector2(25, -96),
-	Vector2(40, -92), Vector2(52, -84), Vector2(60, -74), Vector2(64, -66), Vector2(70, -72), Vector2(80, -68),
-	Vector2(84, -58), Vector2(78, -48), Vector2(68, -50), Vector2(64, -56), Vector2(60, -46), Vector2(55, -31),
-	Vector2(45, -27), Vector2(43, -20), Vector2(40, -10), Vector2(31, -7), Vector2(26, -12), Vector2(25, -20),
-	Vector2(19, -24), Vector2(13.5, -22), Vector2(14, -16), Vector2(16, -10), Vector2(16.2, -4), Vector2(16.2, 0.6),
+	Vector2(11.8, 0.6), Vector2(10.5, -6), Vector2(8, -12), Vector2(5, -18), Vector2(3.5, -24), Vector2(-6, -29), Vector2(-18, -33), Vector2(-30, -40),
+	Vector2(-37, -52), Vector2(-50, -54), Vector2(-62, -50), Vector2(-70, -38), Vector2(-72, -24), Vector2(-66, -10), Vector2(-60, 2), Vector2(-66, 16),
+	Vector2(-82, 24), Vector2(-100, 20), Vector2(-112, 6), Vector2(-110, -10), Vector2(-98, -20), Vector2(-86, -24), Vector2(-86, -30), Vector2(-104, -34),
+	Vector2(-116, -46), Vector2(-120, -62), Vector2(-112, -80), Vector2(-96, -90), Vector2(-78, -86), Vector2(-66, -72), Vector2(-52, -66), Vector2(-39, -64),
+	Vector2(-34, -77), Vector2(-22, -88), Vector2(-6, -95), Vector2(12, -96), Vector2(15, -106), Vector2(23, -106), Vector2(25, -96), Vector2(40, -92),
+	Vector2(42, -104), Vector2(40, -116), Vector2(34, -124), Vector2(32, -140), Vector2(42, -154), Vector2(60, -160), Vector2(78, -150), Vector2(84, -134),
+	Vector2(76, -118), Vector2(62, -112), Vector2(54, -102), Vector2(52, -90), Vector2(52, -84), Vector2(60, -74), Vector2(64, -66), Vector2(70, -72),
+	Vector2(80, -68), Vector2(84, -58), Vector2(78, -48), Vector2(68, -50), Vector2(64, -56), Vector2(60, -46), Vector2(55, -31), Vector2(45, -27),
+	Vector2(43, -20), Vector2(40, -10), Vector2(31, -7), Vector2(26, -12), Vector2(25, -20), Vector2(19, -24), Vector2(13.5, -22), Vector2(14, -16),
+	Vector2(16, -10), Vector2(16.2, -4), Vector2(16.2, 0.6),
 ]
 
 const GOUFFRE := Vector3(2, 0, -58)
@@ -33,17 +36,32 @@ const DESCENTE := Vector3(19, 0, -103)
 const CAMPEMENT := Vector3(20, 0, -78)
 const AUTEL := Vector3(-27, 0, -72)
 const NID := Vector3(-24, 0, -46)
+## Ailes ajoutées pour accueillir une vingtaine de joueurs : chacune a son identité, ses camps, son élite ou son trésor.
+const OSSUAIRE := Vector3(-94, 0, -60)        ## aile ouest : tombes royales, lumière verte
+const TRONE_REINE := Vector3(-108, 0, -62)
+const PUITS := Vector3(-76, 0, -46)           ## second camp sûr et second point d'arrivée
+const LAC := Vector3(-88, 0, 3)               ## aile sud-ouest : lac noir
+const LAC_R := Vector2(13, 8)
+const FORGES := Vector3(58, 0, -134)          ## aile nord-est : forges naines englouties, lave
+const ENCLUME_BROKK := Vector3(60, 0, -150)
+const ARRIVEES := [Vector3(14, 0, 14), Vector3(-76, 0, -46)]
 
 const LIEUX := [
 	{"id": "crypte", "nom": "Crypte des nains", "centre": Vector3(14, 0, 14), "rect": Rect2(0, 0, 28, 28)},
 	{"id": "camp", "nom": "Camp des Égarés", "centre": Vector3(34, 0, -16), "rayon": 10.0, "sur": true},
+	{"id": "puits", "nom": "Camp du Puits", "centre": Vector3(-76, 0, -46), "rayon": 10.0, "sur": true},
 	{"id": "tunnel", "nom": "Boyau des Murmures", "centre": Vector3(10, 0, -12), "rayon": 10.0},
 	{"id": "antre", "nom": "Antre du Jarl", "centre": Vector3(74, 0, -59), "rayon": 11.0},
+	{"id": "trone", "nom": "Trône de la Reine pâle", "centre": Vector3(-106, 0, -62), "rayon": 12.0},
+	{"id": "enclume", "nom": "Enclume de Brokk", "centre": Vector3(60, 0, -148), "rayon": 12.0},
 	{"id": "descente", "nom": "La Descente", "centre": Vector3(19, 0, -101), "rayon": 8.0},
 	{"id": "nid", "nom": "Nid des rampants", "centre": Vector3(-24, 0, -46), "rayon": 12.0},
 	{"id": "autel", "nom": "Autel du nécromant", "centre": Vector3(-27, 0, -72), "rayon": 11.0},
 	{"id": "campement", "nom": "Campement draugr", "centre": Vector3(20, 0, -78), "rayon": 12.0},
 	{"id": "gouffre", "nom": "Le Gouffre sans fond", "centre": Vector3(2, 0, -58), "rayon": 14.0},
+	{"id": "lac", "nom": "Lac des Noyés", "centre": Vector3(-88, 0, 2), "rayon": 26.0},
+	{"id": "ossuaire", "nom": "Ossuaire des Rois", "centre": Vector3(-94, 0, -60), "rayon": 30.0},
+	{"id": "forges", "nom": "Forges englouties", "centre": Vector3(58, 0, -134), "rayon": 28.0},
 	{"id": "caverne", "nom": "Grande Caverne", "centre": Vector3(14, 0, -60), "rayon": 999.0},
 ]
 
@@ -82,6 +100,7 @@ func _ready() -> void:
 	add_child(crypte)
 	ZoneSure.vider()
 	ZoneSure.ajouter("Camp des Égarés", CAMP, 9.0)
+	ZoneSure.ajouter("Camp du Puits", PUITS, 9.0)
 	_sol()
 	_parois()
 	_gouffre()
@@ -94,6 +113,12 @@ func _ready() -> void:
 	_nid()
 	_antre()
 	_descente()
+	_ossuaire()
+	_camp_du_puits()
+	_lac()
+	_forges()
+	_arrivees()
+	_vider_rochers()
 
 # =================== briques ===================
 
@@ -120,9 +145,52 @@ func poser(chemin: String, pos: Vector3, rot_deg := 0.0, echelle = 1.0, teinte :
 	return n
 
 ## Pose un rocher à la taille voulue (largeur au sol, hauteur), quelle que soit la variante.
+## Les rochers sont regroupés par modèle et teinte puis dessinés en instances multiples (MultiMesh) :
+## des centaines de rochers pour le prix de quelques appels de dessin — indispensable sur téléphone.
+var _lots := {}
+
 func rocher(nom: String, pos: Vector3, largeur: float, hauteur: float, teinte := TEINTE_ROCHE) -> void:
 	var t: Vector2 = ROCHERS[nom]
-	poser(F + nom + "_Color1.gltf", pos, _rng.randf_range(0, 360), Vector3(largeur / t.x, hauteur / t.y, largeur / t.x), teinte)
+	# lots découpés aussi par zone de 32 m : chaque lot ne reçoit que les lumières proches (limite par objet)
+	var cle := nom + "|" + teinte.to_html() + "|" + str(floori(pos.x / 32.0)) + "," + str(floori(pos.z / 32.0))
+	if not _lots.has(cle):
+		_lots[cle] = {"nom": nom, "teinte": teinte, "xf": []}
+	var b := Basis(Vector3.UP, _rng.randf_range(0, TAU)).scaled(Vector3(largeur / t.x, hauteur / t.y, largeur / t.x))
+	_lots[cle]["xf"].append(Transform3D(b, pos))
+
+func _vider_rochers() -> void:
+	for cle in _lots:
+		var lot: Dictionary = _lots[cle]
+		var n: Node3D = _scene(F + lot["nom"] + "_Color1.gltf").instantiate()
+		var mis := n.find_children("*", "MeshInstance3D", true, false)
+		if mis.is_empty():
+			n.free()
+			continue
+		var mi: MeshInstance3D = mis[0]
+		var local := Transform3D()
+		var x: Node = mi
+		while x != n and x is Node3D:
+			local = (x as Node3D).transform * local
+			x = x.get_parent()
+		var mesh: Mesh = mi.mesh.duplicate()
+		for k in mesh.get_surface_count():
+			var mat := mi.get_active_material(k)
+			if mat is StandardMaterial3D:
+				var m2: StandardMaterial3D = mat.duplicate()
+				m2.albedo_color = lot["teinte"]
+				mesh.surface_set_material(k, m2)
+		n.free()
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = mesh
+		var xfs: Array = lot["xf"]
+		mm.instance_count = xfs.size()
+		for i in xfs.size():
+			mm.set_instance_transform(i, xfs[i] * local)
+		var mmi := MultiMeshInstance3D.new()
+		mmi.multimesh = mm
+		_decor.add_child(mmi)
+	_lots.clear()
 
 func boite(centre: Vector3, taille: Vector3, rot_y := 0.0) -> void:
 	var corps := StaticBody3D.new()
@@ -310,7 +378,8 @@ func _gouffre() -> void:
 
 func _stalagmites() -> void:
 	# groupes de colonnes de roche : ils cassent les lignes de vue et donnent des abris pendant les combats
-	var groupes := [Vector2(-12, -42), Vector2(30, -50), Vector2(42, -70), Vector2(-20, -62), Vector2(6, -84), Vector2(-4, -36), Vector2(48, -40), Vector2(-30, -82)]
+	var groupes := [Vector2(-12, -42), Vector2(30, -50), Vector2(42, -70), Vector2(-20, -62), Vector2(6, -84), Vector2(-4, -36), Vector2(48, -40), Vector2(-30, -82),
+			Vector2(-84, -72), Vector2(-100, -44), Vector2(-80, -36), Vector2(-70, 6), Vector2(-104, 10), Vector2(44, -128), Vector2(70, -124), Vector2(48, -146)]
 	for g in groupes:
 		for k in _rng.randi_range(2, 4):
 			var p: Vector2 = g + Vector2(_rng.randf_range(-3.5, 3.5), _rng.randf_range(-3.5, 3.5))
@@ -320,8 +389,8 @@ func _stalagmites() -> void:
 			rocher(AIGUILLES[_rng.randi() % AIGUILLES.size()], Vector3(p.x, 0.0, p.y), e, _rng.randf_range(3.5, 6.0))
 			cylindre(Vector3(p.x, 0, p.y), e * 0.42)
 	# éboulis au sol, partout, peu denses
-	for i in 140:
-		var p := Vector2(_rng.randf_range(-40, 85), _rng.randf_range(-107, -2))
+	for i in 320:
+		var p := Vector2(_rng.randf_range(-120, 85), _rng.randf_range(-160, 24))
 		if not dedans(p, 1.5):
 			continue
 		rocher("Rock_2_A", Vector3(p.x, 0, p.y), _rng.randf_range(0.3, 0.9), _rng.randf_range(0.3, 0.9))
@@ -506,3 +575,177 @@ func _descente() -> void:
 	for p in [Vector3(-3.5, 0, 1.5), Vector3(3.5, 0, 1.5)]:
 		poser(DJ + "torch_lit.glb", c + p, 0.0, 1.4)
 		lumiere(c + p + Vector3(0, 2.2, 0), Color(0.5, 0.75, 1.0), 1.2, 7.0, true)
+
+# =================== ailes pour vingt joueurs ===================
+
+func _disque(centre: Vector3, rayons: Vector2, shader: String, y := 0.01) -> MeshInstance3D:
+	var m := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = rayons * 2.0
+	m.mesh = pm
+	var mat := ShaderMaterial.new()
+	mat.shader = load(shader)
+	m.material_override = mat
+	m.position = centre + Vector3(0, y, 0)
+	m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(m)
+	return m
+
+## Ceinture de collisions autour d'une ellipse (lac, gouffre, lave) : on longe, on ne tombe pas.
+func _ceinture(centre: Vector3, rayons: Vector2, n := 20) -> void:
+	for i in n:
+		var a := TAU * i / n
+		cylindre(centre + Vector3(cos(a) * rayons.x, 0, sin(a) * rayons.y) * 0.93, minf(rayons.x, rayons.y) * 0.32 + 0.6, 3.0)
+
+func _ossuaire() -> void:
+	var c := OSSUAIRE
+	var vert := Color(0.35, 1.0, 0.55)
+	# allées de tombes royales : rangées régulières qui guident vers le trône au fond
+	for rangee in 3:
+		for k in 5:
+			var p := c + Vector3(-6 + k * 7.0, 0, -14 + rangee * 12.0)
+			if not dedans(Vector2(p.x, p.z), 2.5):
+				continue
+			poser(HW + ["grave_A", "grave_B", "gravestone", "grave_A_destroyed"][(k + rangee) % 4] + ".gltf", p, 90.0 + _rng.randf_range(-8, 8), 1.5)
+			cylindre(p, 0.6, 1.6)
+	# deux mausolées au fond de l'aile (loin du camp du Puits, jamais sur un passage)
+	var poses := 0
+	for p in [c + Vector3(4, 0, -24), c + Vector3(-12, 0, -22), c + Vector3(-14, 0, 18), c + Vector3(8, 0, 22)]:
+		if poses >= 2 or not dedans(Vector2(p.x, p.z), 5.0) or p.distance_to(PUITS) < 16.0:
+			continue
+		poser(HW + "crypt.gltf", p, 90.0, 1.3)
+		boite(p + Vector3(0, 2, 0), Vector3(4.2, 4, 5.0))
+		poses += 1
+	for p in [c + Vector3(4, 0, -22), c + Vector3(-12, 0, 20), c + Vector3(20, 0, 2)]:
+		poser(HW + "coffin_decorated.gltf", p, _rng.randf_range(0, 360), 1.2)
+	# trône de la Reine pâle : colonnes, bannières, autel de bougies, coffre épique (violet)
+	var t := TRONE_REINE
+	for p in [t + Vector3(-2, 0, -7), t + Vector3(-2, 0, 7)]:
+		poser(DJ + "column.glb", p, 0.0, 1.0)
+		cylindre(p, 0.9)
+	poser(HW + "shrine_candles.gltf", t + Vector3(-6, 0, 0), 90.0, 2.0)
+	cylindre(t + Vector3(-6, 0, 0), 1.6, 2.0)
+	poser(DJ + "chest_gold.glb", t + Vector3(-3.5, 0, 3.5), 90.0, 1.4)
+	boite(t + Vector3(-3.5, 0.6, 3.5), Vector3(1.4, 1.2, 2.4))
+	lumiere(t + Vector3(-2.5, 1.6, 3.5), Color(0.7, 0.4, 1.0), 2.2, 8.0)
+	lumiere(t + Vector3(0, 2.5, 0), vert, 2.6, 16.0, true)
+	for d in [[c + Vector3(-4, 0, -24), 1.1], [c + Vector3(8, 0, 24), 1.0], [c + Vector3(-20, 0, 18), 0.9], [c + Vector3(22, 0, -10), 0.9], [c + Vector3(-8, 0, 6), 0.8]]:
+		if dedans(Vector2(d[0].x, d[0].z), 1.0):
+			_cristal(d[0], vert, d[1])
+	for i in 18:
+		var p := c + Vector3(_rng.randf_range(-22, 22), 0, _rng.randf_range(-24, 24))
+		if dedans(Vector2(p.x, p.z), 1.5):
+			poser(HW + ["skull", "bone_A", "bone_B", "bone_C", "ribcage"][i % 5] + ".gltf", p, _rng.randf_range(0, 360), 1.2)
+
+func _camp_du_puits() -> void:
+	var c := PUITS
+	# deuxième refuge : un vieux puits de lumière tombe du plafond, un feu, une tente, une gardienne
+	for i in 10:
+		var a := TAU * i / 10.0
+		poser(F + "Rock_2_A_Color1.gltf", c + Vector3(cos(a), 0, sin(a)) * 1.0, rad_to_deg(a) * 3.0, 2.2)
+	for d in [[0.0, Vector3(0, 0.12, 0)], [70.0, Vector3(0.05, 0.3, 0)], [135.0, Vector3(-0.05, 0.2, 0.05)]]:
+		var b := poser(R + "Wood_Log_A.gltf", c + d[1], d[0], 1.1)
+		b.rotation_degrees.z = 12.0
+	_feu(c + Vector3(0, 0.35, 0), 1.2)
+	lumiere(c + Vector3(0, 2.3, 0), Color(1.0, 0.58, 0.25), 3.0, 15.0, true)
+	cylindre(c, 1.2, 1.0)
+	poser(H + "decoration/props/tent.gltf", c + Vector3(5.5, 0, -3.0), 220.0, 7.0)
+	boite(c + Vector3(5.5, 1.5, -3.0), Vector3(3.2, 3, 3.2), deg_to_rad(220))
+	poser(HW + "bench.gltf", c + Vector3(-2.8, 0, 2.4), -40.0, 0.95)
+	poser(H + "decoration/props/barrel.gltf", c + Vector3(-5.0, 0, -3.5), 0.0, 6.0)
+	cylindre(c + Vector3(-5.0, 0, -3.5), 0.6, 1.4)
+	# le puits de lumière : un cône pâle venu d'en haut, visible de loin dans l'aile ouest
+	var rayon := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 1.2
+	cm.bottom_radius = 3.2
+	cm.height = 16.0
+	cm.cap_top = false
+	cm.cap_bottom = false
+	rayon.mesh = cm
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	mat.disable_fog = true
+	mat.albedo_color = Color(0.75, 0.85, 1.0, 0.07)
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	rayon.material_override = mat
+	rayon.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	rayon.position = c + Vector3(-4, 8, 4)
+	_decor.add_child(rayon)
+	lumiere(c + Vector3(-4, 4, 4), Color(0.7, 0.8, 1.0), 1.6, 12.0)
+	_anneau(c, 9.5, Color(1.0, 0.78, 0.4), 0.35)
+
+func _anneau(c: Vector3, rayon: float, couleur: Color, alpha: float) -> void:
+	var anneau := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(rayon * 2.0, rayon * 2.0)
+	anneau.mesh = pm
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://shaders/anneau_sol.gdshader")
+	mat.set_shader_parameter("couleur", couleur)
+	mat.set_shader_parameter("rayon", 0.95)
+	mat.set_shader_parameter("alpha", alpha)
+	anneau.material_override = mat
+	anneau.position = c + Vector3(0, 0.05, 0)
+	_decor.add_child(anneau)
+
+func _lac() -> void:
+	var c := LAC
+	_disque(c, LAC_R, "res://shaders/lac.gdshader")
+	_ceinture(c, LAC_R, 22)
+	var turquoise := Color(0.3, 0.95, 0.85)
+	# champignons-cristaux turquoise sur les rives : la seule lumière de l'aile
+	for i in 7:
+		var a := TAU * i / 7.0 + 0.3
+		var p := c + Vector3(cos(a) * (LAC_R.x + 4.5), 0, sin(a) * (LAC_R.y + 4.0))
+		if dedans(Vector2(p.x, p.z), 1.5):
+			_cristal(p, turquoise, 0.8)
+	# une barque échouée et un coffre rare sur la rive nord : on le voit de l'autre côté de l'eau
+	poser(HW + "coffin.gltf", c + Vector3(6, 0, -12.5), 20.0, 1.2)
+	poser(DJ + "chest.glb", c + Vector3(-4, 0, -13), 10.0, 1.2)
+	boite(c + Vector3(-4, 0.5, -13), Vector3(1.6, 1.0, 1.3))
+	lumiere(c + Vector3(-4, 1.4, -12), Color(0.35, 0.6, 1.0), 1.8, 7.0)
+	lumiere(c + Vector3(0, 1.5, 0), Color(0.25, 0.7, 0.8), 1.5, 18.0)
+
+func _forges() -> void:
+	var c := FORGES
+	var lave := Color(1.0, 0.45, 0.12)
+	# ruines d'une forge naine : murs écroulés, piliers, enclumes, rivières de lave
+	for d in [[c + Vector3(-14, 0, -6), 0.0], [c + Vector3(-14, 0, 2), 0.0], [c + Vector3(16, 0, -10), 90.0], [c + Vector3(10, 0, 12), 30.0]]:
+		poser(DJ + "wall_broken.glb", d[0], d[1], 1.0)
+		boite(d[0] + Vector3(0, 2, 0), Vector3(4, 4, 1), deg_to_rad(d[1]))
+	for p in [c + Vector3(-6, 0, -10), c + Vector3(6, 0, -10), c + Vector3(-6, 0, 8), c + Vector3(6, 0, 8)]:
+		poser(DJ + "pillar.glb", p, 0.0, 1.0)
+		cylindre(p, 0.8)
+	for d in [[c + Vector3(-20, 0, -16), Vector2(4, 3)], [c + Vector3(18, 0, 2), Vector2(3.5, 5)], [c + Vector3(0, 0, -20), Vector2(5, 3)]]:
+		if dedans(Vector2(d[0].x, d[0].z), 3.0):
+			_disque(d[0], d[1], "res://shaders/lave.gdshader", 0.02)
+			_ceinture(d[0], d[1], 12)
+			lumiere(d[0] + Vector3(0, 1.5, 0), lave, 2.6, 12.0, true)
+	for p in [c + Vector3(-2, 0, 0), c + Vector3(3, 0, -3)]:
+		poser("res://assets/surface/outils/anvil.gltf", p, _rng.randf_range(0, 360), 1.3)
+		boite(p + Vector3(0, 0.5, 0), Vector3(1.8, 1.0, 0.9))
+	for p in [c + Vector3(-10, 0, 14), c + Vector3(14, 0, -18), c + Vector3(-18, 0, 4)]:
+		poser(DJ + ["barrel_large", "crates_stacked", "keg_decorated"][_rng.randi() % 3] + ".glb", p, _rng.randf_range(0, 360), 1.0)
+		cylindre(p, 1.0, 2.0)
+	poser(R + "Iron_Bars_Stack_Medium.gltf", c + Vector3(-4, 0, 4), 20.0, 1.4)
+	poser(R + "Gold_Bars_Stack_Small.gltf", ENCLUME_BROKK + Vector3(3, 0, -3), 0.0, 1.6)
+	# l'enclume de Brokk : un brasier géant et un coffre légendaire
+	var e := ENCLUME_BROKK
+	poser("res://assets/surface/outils/anvil.gltf", e, 0.0, 2.2)
+	boite(e + Vector3(0, 0.8, 0), Vector3(3.4, 1.6, 1.6))
+	_feu(e + Vector3(-4, 0.4, -2), 1.6)
+	lumiere(e + Vector3(-4, 2.5, -2), lave, 3.2, 16.0, true)
+	poser(DJ + "chest_gold.glb", e + Vector3(4, 0, -4), 200.0, 1.6)
+	boite(e + Vector3(4, 0.6, -4), Vector3(2.6, 1.4, 2.2))
+	lumiere(e + Vector3(4, 1.6, -2.5), Color(1.0, 0.6, 0.15), 2.4, 8.0)
+
+## Points d'arrivée : là où le Portail dépose les joueurs. Deux points éloignés pour que vingt joueurs
+## ne s'entassent pas dans la même salle.
+func _arrivees() -> void:
+	for p in ARRIVEES:
+		_anneau(p, 4.0, Color(0.5, 0.85, 1.0), 0.5)
+		lumiere(p + Vector3(0, 2.0, 0), Color(0.5, 0.8, 1.0), 1.0, 7.0)

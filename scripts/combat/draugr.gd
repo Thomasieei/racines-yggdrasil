@@ -50,6 +50,35 @@ const TYPES := {
 			 "portee_min": 5.0, "portee_max": 10.0, "bond": true, "etourdir": 0.8},
 		],
 	},
+	"reine": {
+		"nom": "Sigrid la Pâle", "modele": "squelette_mage.glb", "arme_d": "skeleton_staff.glb", "arme_g": "",
+		"pv": 1700.0, "vitesse": 2.6, "echelle": 1.45, "portee": 11.0, "garde": 6.0, "armure": true, "elite": true,
+		"attaques": [
+			{"id": "invocation", "forme": "cercle", "rayon": 2.0, "angle": 0.0, "prep": 1.2, "degats": 0.0,
+			 "anim": "Spellcast_Raise", "impact_anim": 1.2, "recup": 0.8, "cd": 16.0, "son": "verre_lourd",
+			 "sur_soi": true, "invoque": 3, "portee_min": 0.0, "portee_max": 14.0},
+			{"id": "nova", "forme": "cercle", "rayon": 5.5, "angle": 0.0, "prep": 1.6, "degats": 260.0,
+			 "anim": "Spellcast_Shoot", "impact_anim": 0.42, "recup": 1.2, "cd": 9.0, "son": "verre_lourd",
+			 "sur_soi": true, "ralentir": 2.5, "portee_min": 0.0, "portee_max": 5.0},
+			{"id": "gel", "forme": "cercle", "rayon": 3.0, "angle": 0.0, "prep": 1.3, "degats": 230.0,
+			 "anim": "Spellcast_Shoot", "impact_anim": 0.42, "recup": 0.9, "cd": 3.6, "son": "verre_lourd",
+			 "sur_cible": true, "ralentir": 2.0},
+		],
+	},
+	"brokk": {
+		"nom": "Brokk le Déchu", "modele": "squelette_warrior.glb", "arme_d": "skeleton_blade.glb", "arme_g": "skeleton_shield_large_a.glb",
+		"pv": 2100.0, "vitesse": 3.0, "echelle": 1.55, "portee": 3.3, "garde": 0.0, "armure": true, "elite": true,
+		"attaques": [
+			{"id": "fendre", "forme": "cone", "rayon": 4.2, "angle": 1.05, "prep": 1.0, "degats": 270.0,
+			 "anim": "2H_Melee_Attack_Chop", "impact_anim": 0.62, "recup": 0.9, "cd": 2.3, "son": "coup_lourd"},
+			{"id": "tourbillon", "forme": "cercle", "rayon": 4.8, "angle": 0.0, "prep": 1.4, "degats": 310.0,
+			 "anim": "2H_Melee_Attack_Spin", "impact_anim": 0.9, "recup": 1.4, "cd": 7.5, "son": "coup_lourd",
+			 "sur_soi": true, "portee_min": 0.0, "portee_max": 4.6},
+			{"id": "saut", "forme": "cercle", "rayon": 3.6, "angle": 0.0, "prep": 1.2, "degats": 290.0,
+			 "anim": "1H_Melee_Attack_Jump_Chop", "impact_anim": 0.72, "recup": 1.3, "cd": 9.0, "son": "atterrissage",
+			 "portee_min": 5.0, "portee_max": 10.0, "bond": true, "etourdir": 0.8},
+		],
+	},
 	"mage": {
 		"nom": "Draugr nécromant", "modele": "squelette_mage.glb", "arme_d": "skeleton_staff.glb", "arme_g": "",
 		"pv": 240.0, "vitesse": 2.7, "echelle": 1.0, "portee": 10.0, "garde": 6.0, "armure": false,
@@ -78,6 +107,8 @@ var _flottement := 0.0       ## petit décalage latéral pour que la meute encer
 var _base_vitesse_anim := 1.0
 var _hit_t := 0.0
 var attaques_lancees := 0
+var invoque := false            ## sorti d'une invocation : ne réapparaît pas, ne compte pas pour son camp
+var camp_id := ""               ## camp d'origine (repeuplement)
 var _foyer := Vector3.ZERO
 
 func configurer(t: String) -> void:
@@ -242,6 +273,9 @@ func _impact() -> void:
 	_tele = null
 	_cds[a["id"]] = a["cd"]
 	var degats := {"montant": a["degats"], "source": self, "ralentir": a.get("ralentir", 0.0), "etourdir": a.get("etourdir", 0.0), "lourd": a["degats"] >= 180.0}
+	if a.get("invoque", 0) > 0:
+		_invoquer(a["invoque"])
+		return
 	match a["forme"]:
 		"cone":
 			Effets.taille(get_parent(), global_position, _dir_attaque, a["rayon"], Color(1.0, 0.35, 0.25, 0.9), "slash_02.png", 0.2, -0.8)
@@ -267,6 +301,21 @@ func _impact() -> void:
 		"ligne":
 			_tirer_carreau(degats, a["rayon"])
 			Sons.jouer("elan", global_position, -2.0, 1.4)
+
+## La Reine pâle relève des rampants autour d'elle (ils sortent de terre déjà éveillés).
+func _invoquer(n: int) -> void:
+	Effets.onde(get_parent(), global_position, 3.5, Color(0.4, 1.0, 0.55), 0.6)
+	Effets.flash_lumiere(get_parent(), global_position, Color(0.4, 1.0, 0.55), 4.0, 9.0, 0.4)
+	Sons.jouer("verre_lourd", global_position, 0.0, 0.7)
+	for i in n:
+		var a := TAU * i / n + randf() * 0.5
+		var d := Draugr.new()
+		d.configurer("minion")
+		d.invoque = true
+		d.position = global_position + Vector3(cos(a), 0, sin(a)) * 3.0
+		get_parent().add_child(d)
+		if _cible_touchable():
+			d.reveiller(cible)
 
 func _cible_touchable() -> bool:
 	return is_instance_valid(cible) and not cible.est_mort

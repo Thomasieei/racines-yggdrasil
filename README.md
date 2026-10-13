@@ -16,9 +16,12 @@ Donjon d'extraction mobile (Godot 4.3, paysage). Un donjon du jour partagé, Fre
 4. Un guerrier et un arbalétrier draugr gardent le chemin.
 5. **Bourg de Skjold**, zone sûre : gardes, marchand, forgeronne, feu de camp. Les sorts offensifs y sont refusés, les monstres n'y entrent pas.
 6. **Portail d'Yggdrasil** au nord du Bourg : entrer dedans fait descendre dans la **Crypte des nains** (le donjon du jour, cinq draugr).
-7. La sortie nord de la crypte ouvre sur le **Boyau des Murmures**, puis la **Grande Caverne** (près de 7 000 m², sombre, éclairée par des cristaux et des braseros) :
-   nid des rampants, autel du nécromant, gouffre sans fond, campement draugr, **antre du Jarl Hrafnkel** (élite, coffre légendaire),
-   **camp des Égarés** (zone sûre, gardienne, marchand) et la Descente vers l'étage 2 (scellée pour l'instant).
+7. La sortie nord de la crypte ouvre sur le **Boyau des Murmures**, puis l'**étage 1 du donjon** : environ 15 000 m² de grottes sombres en quatre ailes, pensé pour une vingtaine de joueurs à la fois.
+   - **Grande Caverne** : nid des rampants, autel du nécromant, gouffre sans fond, campement draugr, antre du **Jarl Hrafnkel** (élite), camp des Égarés (zone sûre), la Descente vers l'étage 2 (scellée).
+   - **Ossuaire des Rois** (ouest) : allées de tombes, garde royale, trône de **Sigrid la Pâle** (élite qui relève les morts), **camp du Puits** (zone sûre et second point d'arrivée).
+   - **Lac des Noyés** (sud-ouest) : lac noir infranchissable, noyés sur les rives, coffre sur la berge nord.
+   - **Forges englouties** (nord-est) : ruines naines, coulées de lave, enclume de **Brokk le Déchu** (élite).
+   - 25 camps, environ 60 draugr. Un camp vidé se repeuple après 1 à 4 minutes, jamais sous les yeux d'un joueur. Les draugr loin de tout joueur sont mis en sommeil (ni IA ni animation) pour garder le téléphone fluide.
 8. Mourir ramène au sanctuaire.
 
 Pas encore branchés : menus du marchand et de la forge, sac et inventaire en jeu, coffres et butin, corps à récupérer, multijoueur.
