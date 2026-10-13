@@ -61,6 +61,16 @@ func _rendre(n: Node3D, nom: String, rot := Vector3(0, 30, 0)) -> void:
 	var acc: Array = [null]
 	_aabb(n, n.global_transform, acc)
 	var b: AABB = acc[0]
+	# modèle animé : l'AABB du maillage est celle de la pose de repos ; on cadre sur les os de la pose jouée
+	var sq := n.find_children("*", "Skeleton3D", true, false)
+	if not sq.is_empty():
+		for i in 4:
+			await get_tree().process_frame
+		var sk: Skeleton3D = sq[0]
+		var bb := AABB(sk.global_transform * sk.get_bone_global_pose(0).origin, Vector3.ZERO)
+		for k in sk.get_bone_count():
+			bb = bb.expand(sk.global_transform * sk.get_bone_global_pose(k).origin)
+		b = bb.grow(bb.size.length() * 0.08)
 	var c := b.get_center()
 	var r := b.size.length() * 0.5
 	var dist := r / sin(deg_to_rad(cam.fov * 0.5)) * 1.02

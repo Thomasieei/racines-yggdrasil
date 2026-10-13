@@ -6,7 +6,7 @@ extends CanvasLayer
 var _vp: SubViewport
 var _oeuf: Node3D
 var _dragon: Node3D
-var _mat: ShaderMaterial
+var _mats: Array = []
 var _titre: Label
 var _sous: Label
 var _boutons: Control
@@ -54,7 +54,7 @@ func lancer(oeuf: Dictionary, dragon: Dictionary, rappel: Callable) -> void:
 	_oeuf = DragonVisuel.oeuf(oeuf["rarete"])
 	_oeuf.position.y = 0.2
 	_vp.add_child(_oeuf)
-	_mat = (_oeuf.get_node("Coque") as MeshInstance3D).material_override
+	_mats = _oeuf.get_meta("mats")
 	_titre = _lab("", 30, Color.WHITE, 446, fond)
 	_sous = _lab("L'œuf s'agite…", 17, Color("#CFD6EE"), 488, fond)
 	_flash = ColorRect.new()
@@ -92,8 +92,9 @@ func _sequence(oeuf: Dictionary, d: Dictionary) -> void:
 		var amp := 0.03 + k * k * 0.22
 		_oeuf.rotation.z = sin(t * (14.0 + k * 30.0)) * amp
 		_oeuf.position.y = 0.2 + absf(sin(t * 9.0)) * 0.04 * k
-		_mat.set_shader_parameter("fissure", k * 0.9)
-		_mat.set_shader_parameter("eclat", 0.8 + k * 0.8)
+		for m in _mats:
+			m.set_shader_parameter("fissure", k * 0.9)
+			m.set_shader_parameter("eclat", 0.8 + k * 0.8)
 		if fmod(t, 0.5) < dt:
 			Sons.jouer("verre_leger", Vector3.ZERO, -8.0 + k * 6.0, 0.8 + k * 0.6)
 	# 2. éclat dans la couleur du dragon

@@ -27,3 +27,8 @@ Les personnages ont été allégés (animations inutiles retirées), sans autre 
 | assets/icones_sorts | Icônes de sorts dessinées pour le projet (SVG) | propres au projet |
 
 Chaque dossier garde le SOURCE.json (et la licence quand le pack en fournit une) de la banque d'assets.
+
+## Dragons
+
+- `assets/dragons/Dragon_Evolved.gltf` — **Dragon Evolved**, Quaternius, pack *Ultimate Monsters* (CC0 1.0), https://quaternius.com/packs/ultimatemonsters.html. Provenance consignée dans `assets/dragons/LICENCE-Dragon_Evolved.md`. Recoloré en jeu par shader, fichier non modifié.
+- `assets/dragons/DragonEgg_Fire.glb` — œuf de dragon à écailles, création originale de la banque d'assets (CC0 1.0), `assets/dragons/LICENCE-DragonEgg.txt`. Recoloré en jeu par shader.

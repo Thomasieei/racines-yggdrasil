@@ -1,24 +1,27 @@
 extends Node3D
-## Animation du bébé dragon : battements d'ailes, flottement, queue qui ondule, tête qui suit.
+## Animation du bébé dragon (modèle Quaternius) : vol sur place en boucle, léger flottement,
+## et un coup de tête / de griffe quand il attaque.
 
 var _t := 0.0
-var vol := true
+var _anim: AnimationPlayer
+
+func _ready() -> void:
+	_anim = find_child("AnimationPlayer", true, false)
+	if _anim:
+		for n in ["Flying_Idle", "Fast_Flying"]:
+			if _anim.has_animation(n):
+				_anim.get_animation(n).loop_mode = Animation.LOOP_LINEAR
+		_anim.play("Flying_Idle")
+		_anim.seek(randf() * 1.0, true)
+		_anim.animation_finished.connect(func(_n): _anim.play("Flying_Idle", 0.2))
 
 func _process(delta: float) -> void:
 	_t += delta
 	var pivot := get_node_or_null("Pivot")
-	if pivot == null:
-		return
-	var b := sin(_t * (12.0 if vol else 3.0))
-	pivot.position.y = (0.55 + 0.12 * sin(_t * 3.0)) if vol else 0.0
-	for n in ["Aile_g", "Aile_d"]:
-		var a := pivot.get_node_or_null(n)
-		if a:
-			var s := -1.0 if n == "Aile_g" else 1.0
-			a.rotation.z = s * (0.25 + 0.65 * b) if vol else s * 0.9
-	var q := pivot.get_node_or_null("Queue")
-	if q:
-		q.rotation.y = 0.35 * sin(_t * 2.4)
-	var tete := pivot.get_node_or_null("Tete")
-	if tete:
-		tete.rotation.x = 0.08 * sin(_t * 1.7)
+	if pivot:
+		pivot.position.y = 0.08 * sin(_t * 2.6)
+
+## Petite attaque visible (l'acolyte crache au même moment).
+func attaquer() -> void:
+	if _anim and _anim.has_animation("Headbutt"):
+		_anim.play("Headbutt" if randf() < 0.5 else "Punch", 0.1, 1.6)

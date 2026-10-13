@@ -36,7 +36,7 @@ Donjon d'extraction mobile (Godot 4.3, paysage). Un donjon du jour partagé, Fre
 
 Pas encore branchés : menus du marchand et de la forge (la vente du sac marche près d'un marchand), vrai multijoueur en ligne.
 
-Le bébé dragon et l'œuf sont dessinés par le jeu (aucun pack de la banque ne contient de dragon) : c'est une version provisoire, à remplacer par un vrai modèle animé.
+Le bébé dragon est le Dragon Evolved de Quaternius (CC0, animé) et l'œuf un modèle à écailles de la banque d'assets (CC0), tous deux recolorés selon la rareté.
 
 ## Commandes
 

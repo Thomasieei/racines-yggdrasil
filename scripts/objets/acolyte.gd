@@ -31,7 +31,7 @@ func _ready() -> void:
 
 func _appliquer_taille() -> void:
 	var t: float = Objets.stats_dragon(donnees)["taille"]
-	_visuel.scale = Vector3.ONE * t
+	_visuel.scale = Vector3.ONE * t * 1.3
 
 func grandir() -> void:
 	_appliquer_taille()
@@ -70,6 +70,8 @@ func _ennemi() -> Node3D:
 
 ## Boule de feu : petite comète de la couleur du dragon, qui suit sa cible.
 func _cracher(e: Node3D) -> void:
+	if _visuel.has_method("attaquer"):
+		_visuel.attaquer()
 	var col: Color = DragonVisuel.COULEURS[donnees["rarete"]][1]
 	var b := Node3D.new()
 	get_parent().add_child(b)
