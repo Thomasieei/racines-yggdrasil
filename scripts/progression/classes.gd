@@ -10,8 +10,9 @@ class_name Classes
 const IC := "res://assets/icones_sorts/"
 
 const LISTE := {
-	"": {"titre": "Berserker", "couleur": Color("#F4C35A"), "remplace": {}, "stats": {}},
+	"": {"titre": "Berserker", "couleur": Color("#F4C35A"), "remplace": {}, "stats": {}, "arme": "grande_hache"},
 	"souffle": {
+		"arme": "baton", "main_d": "res://assets/armes/staff.gltf",
 		"titre": "Drakonide du Souffle", "couleur": Color("#FF7A3D"), "embleme": IC + "classe_souffle.svg",
 		"devise": "Brûler avant d'être touché.",
 		"remplace": {"q": {"nom": "Souffle ardent", "icone": IC + "souffle.svg", "cd": 5.0, "cout": 14.0, "visee": "direction",
@@ -21,6 +22,7 @@ const LISTE := {
 		"faiblesses": ["−15 % de points de vie", "Fragile au corps à corps"],
 	},
 	"ecailles": {
+		"arme": "epee", "main_d": "res://assets/armes/sword_1handed.gltf", "main_g": "res://assets/armes/shield_round.gltf",
 		"titre": "Drakonide des Écailles", "couleur": Color("#5FD0A0"), "embleme": IC + "classe_ecailles.svg",
 		"devise": "Encaisser, puis rendre.",
 		"remplace": {"r": {"nom": "Carapace d'écailles", "icone": IC + "carapace.svg", "cd": 18.0, "cout": 0.0, "visee": "aucune",
@@ -30,6 +32,7 @@ const LISTE := {
 		"faiblesses": ["−12 % de vitesse de course", "−15 % d'énergie"],
 	},
 	"ailes": {
+		"arme": "dague", "main_d": "res://assets/armes/dagger.gltf", "main_g": "res://assets/armes/dagger.gltf",
 		"titre": "Drakonide des Ailes", "couleur": Color("#7FC8FF"), "embleme": IC + "classe_ailes.svg",
 		"devise": "N'être jamais là où l'on frappe.",
 		"remplace": {"w": {"nom": "Envol", "icone": IC + "envol.svg", "cd": 6.0, "cout": 12.0, "visee": "direction",
@@ -41,6 +44,13 @@ const LISTE := {
 }
 
 const DRACONIQUES := ["souffle", "ecailles", "ailes"]
+
+## Classe à laquelle une arme est réservée (une seule famille d'armes par classe).
+static func classe_de_arme(id_arme: String) -> String:
+	for c in LISTE:
+		if LISTE[c].get("arme", "") == id_arme:
+			return c
+	return "?"
 
 static func fiche(id: String) -> Dictionary:
 	return LISTE.get(id, LISTE[""])

@@ -8,6 +8,7 @@ signal change
 signal realisation(r: Dictionary)
 
 const FICHIER := "user://profil.cfg"
+const VERSION := 2          ## 2 : points du codex rééquilibrés, coût des talents par palier
 
 static var _moi: Profil
 
@@ -28,10 +29,15 @@ static func p() -> Profil:
 
 # ---------------- points ----------------
 
+## Plus un talent est profond dans l'arbre, plus chaque rang coûte : 1, 2, 3, 4 points, ultime 5.
+static func cout(id: String) -> int:
+	var t := Talents.par_id(id)
+	return 5 if t.get("ultime", false) else int(t.get("palier", 0)) + 1
+
 func points_investis() -> int:
 	var n := 0
 	for k in talents:
-		n += talents[k]
+		n += talents[k] * cout(k)
 	return n
 
 func points_libres() -> int:
@@ -57,8 +63,8 @@ func refus_talent(id: String) -> String:
 		for u in Talents.LISTE:
 			if u.get("ultime", false) and u["id"] != id and rang(u["id"]) > 0:
 				return "Tu as déjà choisi « %s »" % u["nom"]
-	if points_libres() <= 0:
-		return "Aucun point disponible"
+	if points_libres() < cout(id):
+		return "Il faut %d point%s (tu en as %d)" % [cout(id), "s" if cout(id) > 1 else "", points_libres()]
 	return ""
 
 func investir(id: String) -> bool:
@@ -134,6 +140,7 @@ func sauver(force := false) -> void:
 	c.set_value("p", "points", points_gagnes)
 	c.set_value("p", "vus", vus)
 	c.set_value("p", "classe", classe)
+	c.set_value("p", "version", VERSION)
 	c.save(FICHIER)
 
 func _charger() -> void:
@@ -151,3 +158,13 @@ func _charger() -> void:
 	points_gagnes = c.get_value("p", "points", 0)
 	vus = c.get_value("p", "vus", {})
 	classe = c.get_value("p", "classe", "")
+	if c.get_value("p", "version", 1) < VERSION:
+		# rééquilibrage : on recompte les réalisations avec les nouveaux paliers et on rend les talents
+		obtenues.clear()
+		points_gagnes = 0
+		talents.clear()
+		for r in Codex.LISTE:
+			if valeur(r["compteur"]) >= r["but"]:
+				obtenues[r["id"]] = true
+				points_gagnes += r["pts"]
+		_sale = true

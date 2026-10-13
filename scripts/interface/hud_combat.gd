@@ -277,6 +277,13 @@ func _dessiner_aventuriers(cam: Camera3D, police: Font) -> void:
 			nom += "  AFK"
 		var coul := Color("#FF7A6A") if hostile else Color("#BFE0FF")
 		coul.a = alpha
+		# tranche de force : sa puissance comparée à la tienne
+		var pb: int = b.puissance()
+		var ratio := float(pb) / maxf(1.0, float(moi.puissance()))
+		var cf := Color("#7FE07A") if ratio < 0.85 else (Color("#F4D35A") if ratio < 1.15 else (Color("#FF9A3D") if ratio < 1.4 else Color("#FF4A3D")))
+		cf.a = alpha
+		_barres.draw_string_outline(police, p + Vector2(-90, 22), "Puissance %d" % pb, HORIZONTAL_ALIGNMENT_CENTER, 180, 12, 4, Color(0, 0, 0, 0.85 * alpha))
+		_barres.draw_string(police, p + Vector2(-90, 22), "Puissance %d" % pb, HORIZONTAL_ALIGNMENT_CENTER, 180, 12, cf)
 		_barres.draw_string_outline(police, p + Vector2(-90, -8), nom, HORIZONTAL_ALIGNMENT_CENTER, 180, 13, 4, Color(0, 0, 0, 0.85 * alpha))
 		_barres.draw_string(police, p + Vector2(-90, -8), nom, HORIZONTAL_ALIGNMENT_CENTER, 180, 13, coul)
 		if b.est_mort:

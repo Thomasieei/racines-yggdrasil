@@ -69,6 +69,8 @@ func desequiper_dragon() -> void:
 			acolyte_noeud.queue_free()
 
 func equiper_arme(a: Dictionary) -> void:
+	if a.get("classe", "") != classe:
+		return
 	sac.objets.erase(a)
 	if not sac.arme.is_empty():
 		sac.objets.append(sac.arme)
@@ -132,6 +134,8 @@ func _ready() -> void:
 	if not ia:
 		classe = Profil.p().classe
 		Profil.p().change.connect(_maj_stats)
+	_armes_visibles()
+	_maj_arme()
 	_maj_stats()
 	for id in COMPETENCES:
 		cds[id] = 0.0
@@ -162,9 +166,9 @@ func declarer_hostile(autre: Node, riposte := false) -> void:
 		return
 	if not hostiles.has(autre) and autre == Jeu.joueur and ia:
 		if riposte:
-			Jeu.notifier("%s riposte ! Celui qui tombe perd tout son sac." % nom_joueur, Color("#FFB37A"))
+			Jeu.notifier("%s riposte !" % nom_joueur, Color("#FFB37A"))
 		else:
-			Jeu.notifier("%s t'attaque ! Celui qui tombe perd tout son sac." % nom_joueur, Color("#FF6A5A"))
+			Jeu.notifier("%s t'attaque !" % nom_joueur, Color("#FF6A5A"))
 	if not hostiles.has(autre):
 		hostiles.append(autre)
 	if not autre.hostiles.has(self):
@@ -190,7 +194,7 @@ func disponible() -> bool:
 
 func interagir(h: Heros) -> void:
 	h.declarer_hostile(self)
-	Jeu.notifier("Tu attaques %s. Celui qui tombe perd tout son sac." % nom_joueur, Color("#FFB37A"))
+	Jeu.notifier("Tu attaques %s : le vainqueur prend le sac." % nom_joueur, Color("#FFB37A"))
 
 # ---------------- statistiques (talents + reliques) ----------------
 
@@ -244,7 +248,39 @@ func _micro_pause(t: float) -> void:
 		Effets.micro_pause(get_tree(), t)
 
 func _maj_arme() -> void:
-	degats_arme = sac.arme.get("degats", 90) / 30.0 if not sac.arme.is_empty() and not (en_epreuve and not ia) else 3.0
+	var ok: bool = not sac.arme.is_empty() and not (en_epreuve and not ia) and sac.arme.get("classe", "") == classe
+	degats_arme = sac.arme.get("degats", 90) / 30.0 if ok else 3.0
+
+## L'arme tenue en main dépend de la classe (grande hache, bâton, épée et bouclier, dagues).
+func _armes_visibles() -> void:
+	if modele == null:
+		return
+	var f := Classes.fiche(classe)
+	var hache := modele.find_child("2H_Axe", true, false)
+	if hache:
+		hache.visible = not f.has("main_d")
+	for cote in [["main_d", "handslot.r"], ["main_g", "handslot.l"]]:
+		if not f.has(cote[0]):
+			continue
+		var sk: Skeleton3D = modele.find_child("Skeleton3D", true, false)
+		if sk == null or sk.find_bone(cote[1]) < 0:
+			continue
+		var ba := BoneAttachment3D.new()
+		ba.bone_name = cote[1]
+		sk.add_child(ba)
+		ba.add_child(load(f[cote[0]]).instantiate())
+
+## Puissance affichée (comme un « niveau d'équipement ») : arme, reliques, talents, classe.
+func puissance() -> int:
+	var p := 600.0 + degats_arme * 100.0
+	p *= 1.0 + stat("sorts") * 0.8 + stat("endurance") * 0.6 + stat("recharge") * 0.6 + stat("energie") * 0.3 + stat("critique")
+	if not ia:
+		p += Profil.p().points_investis() * 12.0
+	else:
+		p += niveau * 15.0
+	if acolyte_noeud and is_instance_valid(acolyte_noeud):
+		p += 80.0 + Objets.RARETES.find(sac.acolyte.get("rarete", "commun")) * 60.0
+	return int(round(p / 10.0)) * 10
 
 ## Action canalisée (miner, ouvrir un coffre, fouiller un corps) : barre de progression,
 ## annulée si l'on bouge, si l'on est frappé ou si l'on lance un sort.

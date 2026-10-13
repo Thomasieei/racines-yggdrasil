@@ -190,7 +190,8 @@ func _remplir_fiche() -> void:
 	# bouton
 	var possible := refus == ""
 	var b := neuf(UI + "rpg/" + ("buttonLong_brown" if possible else "buttonLong_grey") + ".png", 12, Vector2(336, 50), Vector2(22, 392), f)
-	texte("Investir 1 point" if r < t["rangs"] else "Maîtrisé", 18, Color("#FFF4DC") if possible else Color("#E4E4E4"), Vector2(0, 13), b, true, 336, HORIZONTAL_ALIGNMENT_CENTER)
+	var ct := Profil.cout(t["id"])
+	texte(("Investir %d point%s" % [ct, "s" if ct > 1 else ""]) if r < t["rangs"] else "Maîtrisé", 18, Color("#FFF4DC") if possible else Color("#E4E4E4"), Vector2(0, 13), b, true, 336, HORIZONTAL_ALIGNMENT_CENTER)
 	if possible:
 		_clic(b, func(): _investir(t["id"]))
 

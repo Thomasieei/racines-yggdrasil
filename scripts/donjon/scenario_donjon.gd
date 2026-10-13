@@ -147,7 +147,9 @@ func demarrer(p: Node, h: Heros, hd: CanvasLayer) -> void:
 	hud.regler_titre("Étage 1 · Crypte des nains", "Donjon du jour · se referme dans 14:52")
 	recit.quete("Le donjon du jour", "Trouve Bjorn au camp des Égarés (est de la caverne)")
 	await get_tree().create_timer(1.5).timeout
-	recit.voix("Freya", "Ici, je ne te vois presque plus. Reste près de la lumière.", 4.0)
+	if not Profil.p().vu("tuto_donjon"):
+		Profil.p().marquer_vu("tuto_donjon")
+		recit.voix("Freya", "Ici, je ne te vois presque plus. Reste près de la lumière.", 4.0)
 
 # ---------------- quêtes ----------------
 
@@ -329,7 +331,7 @@ func _creer_bot(fiche: Array, pos: Vector3, avec_dragon := false) -> Bot:
 	principale.add_child(b)
 	b.add_to_group("interactif")
 	# équipement de départ : une arme, un peu d'or, des potions, parfois un dragon
-	var arme := Objets.creer(Objets.ARMES[randi() % 4], Objets.tirer_rarete([0.6, 0.32, 0.07, 0.01, 0]))
+	var arme := Objets.creer("grande_hache", Objets.tirer_rarete([0.6, 0.32, 0.07, 0.01, 0]))
 	b.sac.arme = arme
 	b.sac.ajouter_or(randi_range(20, 260))
 	b.sac.ajouter(Objets.creer("potion", "commun", randi_range(0, 2)))

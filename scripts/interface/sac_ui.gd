@@ -131,6 +131,7 @@ func _rafraichir() -> void:
 	texte(_milliers(sac.or_) + " or", 20, Color("#7A4F0C"), Vector2(270, 24), _entete, false)
 	texte("Valeur portée : %s or" % _milliers(sac.valeur()), 13, ENCRE2, Vector2(420, 18), _entete, false)
 	texte("perdue si tu meurs", 12, Color("#A04030"), Vector2(420, 36), _entete, false)
+	texte("Puissance %d" % heros.puissance(), 16, Color("#5A3A10"), Vector2(90, 26), _entete, false)
 	# équipement
 	texte("Équipement", 15, ENCRE, Vector2(0, -2), _equip, false)
 	_case(sac.arme, Vector2(0, 22), 84, _equip, "" if sac.arme.is_empty() else "Arme")
@@ -202,7 +203,11 @@ func _remplir_fiche() -> void:
 	var lignes: Array = []
 	match o["type"]:
 		"arme":
-			lignes = ["Dégâts %d (hache de départ : 90)" % o["degats"], "Équipée, elle remplace la Hache du Jarl."]
+			var cl: String = o.get("classe", "")
+			if cl == heros.classe:
+				lignes = ["Arme de ta classe : %s." % Classes.fiche(cl)["titre"], "Dégâts %d (arme de départ : 90)" % o["degats"], "Elle ne change pas tes compétences, seulement ta puissance."]
+			else:
+				lignes = ["Réservée : %s." % Classes.fiche(cl)["titre"] if Classes.LISTE.has(cl) else "Arme d'une autre classe.", "Dégâts %d" % o["degats"], "Tu ne peux pas la manier. Elle se vend bien au marchand."]
 		"oeuf":
 			lignes = ["Un œuf chaud, il bouge parfois.", "En l'ouvrant : un bébé dragon, de faible à très fort.", "Au-delà du bleu, c'est extrêmement rare."]
 		"dragon":
@@ -244,7 +249,7 @@ func _remplir_fiche() -> void:
 			else:
 				actions.append(["Équiper", func(): heros.equiper_dragon(o); _rafraichir()])
 		"arme":
-			if dans_sac:
+			if dans_sac and o.get("classe", "") == heros.classe:
 				actions.append(["Équiper", func(): heros.equiper_arme(o); _rafraichir()])
 		"potion":
 			actions.append(["Boire", func(): fermer_sac(); heros.lancer("p")])

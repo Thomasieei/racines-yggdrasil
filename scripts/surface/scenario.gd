@@ -42,7 +42,10 @@ func demarrer(p: Node, h: Heros, hd: CanvasLayer, sans_intro := false) -> void:
 		h.pv = 2250.0
 		h.pv_change.emit(h.pv, h.pv_max)
 		_quete_bourg()
-	elif sans_intro:
+	elif Profil.p().vu("tuto_bourg"):
+		# didacticiel déjà vu (une seule fois par joueur) : on repart directement vers le Portail
+		_vers_portail()
+	elif sans_intro or Profil.p().vu("tuto_intro"):
 		etape = 1
 		_quete_bourg()
 	else:
@@ -154,6 +157,7 @@ func _intro() -> void:
 	heros.verrou_anim = 0.0
 	heros.jouer("2H_Melee_Idle", 0.3)
 	_bloquer(false)
+	Profil.p().marquer_vu("tuto_intro")
 	etape = 1
 	_quete_bourg()
 
@@ -206,10 +210,21 @@ func _process(_d: float) -> void:
 				etape = 6
 				guide.arreter()
 				hud.minicarte.cible = Vector2.INF
-				recit.voix("Freya", "Le donjon du jour : la Crypte des nains. Il se refermera à minuit… avec ceux qui y seront encore.", 5.5)
+				if not Profil.p().vu("tuto_portail"):
+					Profil.p().marquer_vu("tuto_portail")
+					recit.voix("Freya", "Le donjon du jour : la Crypte des nains. Il se refermera à minuit… avec ceux qui y seront encore.", 5.5)
 				recit.quete("Le donjon du jour", "Entre dans le Portail quand tu es prêt")
 
+func _vers_portail() -> void:
+	etape = 5
+	recit.quete("Le Portail d'Yggdrasil", "Au nord du Bourg", CarteSurface.PORTAIL)
+	guide.viser(CarteSurface.PORTAIL + Vector3(0, 0, 6))
+	hud.minicarte.cible = Vector2(CarteSurface.PORTAIL.x, CarteSurface.PORTAIL.z)
+
 func _arrivee_bourg() -> void:
+	if Profil.p().vu("tuto_bourg"):
+		_vers_portail()
+		return
 	guide.arreter()
 	hud.minicarte.cible = Vector2.INF
 	await get_tree().create_timer(1.2).timeout
@@ -224,6 +239,8 @@ func _arrivee_bourg() -> void:
 	])
 	await recit.dialogue_fini
 	_bloquer(false)
+	Profil.p().marquer_vu("tuto_bourg")
+	Profil.p().sauver()
 	Jeu.notifier("Codex et Arbre des Racines : en haut à droite.", Color("#FFD36B"), "res://assets/icones_sorts/codex.svg")
 	etape = 5
 	recit.quete("Le Portail d'Yggdrasil", "Au nord du Bourg", CarteSurface.PORTAIL)

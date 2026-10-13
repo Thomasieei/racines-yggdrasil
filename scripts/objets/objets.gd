@@ -24,9 +24,9 @@ const MODELES := {
 	"potion": {"nom": "Potion de soin", "type": "potion", "icone": "res://assets/icones_sorts/potion.svg", "valeur": 25, "pile": 10},
 	"hache": {"nom": "Hache", "type": "arme", "icone": ICO + "000_axe_1handed.png", "valeur": 40},
 	"grande_hache": {"nom": "Grande hache", "type": "arme", "icone": ICO + "001_axe_2handed.png", "valeur": 70},
-	"epee": {"nom": "Épée", "type": "arme", "icone": ICO + "013_sword_1handed.png", "valeur": 45},
+	"epee": {"nom": "Épée et bouclier", "type": "arme", "icone": ICO + "013_sword_1handed.png", "valeur": 45},
 	"espadon": {"nom": "Espadon", "type": "arme", "icone": ICO + "014_sword_2handed.png", "valeur": 75},
-	"dague": {"nom": "Dague", "type": "arme", "icone": ICO + "047_dagger.png", "valeur": 30},
+	"dague": {"nom": "Dagues", "type": "arme", "icone": ICO + "047_dagger.png", "valeur": 30},
 	"baton": {"nom": "Bâton", "type": "arme", "icone": ICO + "052_staff.png", "valeur": 55},
 	"bouclier": {"nom": "Bouclier rond", "type": "arme", "icone": ICO + "004_shield_round.png", "valeur": 35},
 	"arbalete": {"nom": "Arbalète", "type": "arme", "icone": ICO + "045_crossbow_1handed.png", "valeur": 60},
@@ -59,6 +59,7 @@ static func creer(id: String, rarete := "commun", qte := 1) -> Dictionary:
 			var niv := RARETES.find(rarete)
 			o["degats"] = int(round((90 + randi_range(-10, 10)) * (1.0 + niv * 0.22)))
 			o["nom"] = m["nom"] + " " + ["de draugr", "runique", "du Jarl", "d'Yggdrasil", "de Freya"][niv]
+			o["classe"] = Classes.classe_de_arme(id)
 		"oeuf":
 			o["icone"] = ICO2 + "oeuf_" + rarete + ".png"
 			o["nom"] = "Œuf de dragon " + NOMS_RARETE[rarete].to_lower()
@@ -138,7 +139,9 @@ static func tirer_rarete(chances: Array) -> String:
 			return RARETES[i]
 	return "commun"
 
-const ARMES := ["hache", "grande_hache", "epee", "espadon", "dague", "baton", "bouclier", "arbalete"]
+## Une famille d'armes par classe : grande hache (Berserker), bâton (Souffle), épée et bouclier
+## (Écailles), dagues (Ailes). L'arme ne donne que de la puissance ; les compétences viennent de la classe.
+const ARMES := ["grande_hache", "baton", "epee", "dague"]
 
 ## Contenu d'un coffre selon sa rareté : or, objets, et parfois un œuf.
 static func contenu_coffre(rarete: String) -> Dictionary:
