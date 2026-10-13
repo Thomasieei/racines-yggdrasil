@@ -24,6 +24,9 @@ var _poids := 0.0
 
 func _ready() -> void:
 	fov = 40.0
+	# rien d'utile au-delà : le brouillard cache le lointain, autant ne pas le dessiner
+	far = 110.0
+	near = 1.0
 	if cible:
 		_focus = cible.global_position
 

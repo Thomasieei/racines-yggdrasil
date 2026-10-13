@@ -118,6 +118,7 @@ func _ready() -> void:
 	_lac()
 	_forges()
 	_arrivees()
+	_tresors()
 	_vider_rochers()
 
 # =================== briques ===================
@@ -378,7 +379,7 @@ func _gouffre() -> void:
 
 func _stalagmites() -> void:
 	# groupes de colonnes de roche : ils cassent les lignes de vue et donnent des abris pendant les combats
-	var groupes := [Vector2(-12, -42), Vector2(30, -50), Vector2(42, -70), Vector2(-20, -62), Vector2(6, -84), Vector2(-4, -36), Vector2(48, -40), Vector2(-30, -82),
+	var groupes := [Vector2(-12, -42), Vector2(42, -70), Vector2(-20, -62), Vector2(6, -84), Vector2(-4, -36), Vector2(48, -40), Vector2(-30, -82),
 			Vector2(-84, -72), Vector2(-100, -44), Vector2(-80, -36), Vector2(-70, 6), Vector2(-104, 10), Vector2(44, -128), Vector2(70, -124), Vector2(48, -146)]
 	for g in groupes:
 		for k in _rng.randi_range(2, 4):
@@ -524,8 +525,7 @@ func _campement() -> void:
 	boite(c + Vector3(3, 1, -6), Vector3(2.1, 2.1, 2.2), deg_to_rad(15))
 	poser(DJ + "banner_patternC_red.glb", c + Vector3(0, 0, -7.5), 0.0, 1.2)
 	poser(DJ + "sword_shield_broken.glb", c + Vector3(-2, 0, 4), 70.0, 1.0)
-	poser(DJ + "chest.glb", c + Vector3(-1.5, 0, -6.0), 0.0, 1.0)
-	boite(c + Vector3(-1.5, 0.5, -6.0), Vector3(1.5, 1.0, 1.2))
+	Coffre.creer(self, c + Vector3(-1.5, 0, -6.0), "rare", 0.0)
 
 func _autel() -> void:
 	var c := AUTEL
@@ -556,9 +556,7 @@ func _antre() -> void:
 	cylindre(c + Vector3(-3, 0, -6), 1.0)
 	cylindre(c + Vector3(5, 0, -6), 1.0)
 	poser(DJ + "banner_shield_red.glb", c + Vector3(1, 0, -8.5), 0.0, 1.3)
-	var coffre := poser(DJ + "chest_gold.glb", c + Vector3(1, 0, -5), 180.0, 1.6)
-	boite(c + Vector3(1, 0.6, -5), Vector3(2.6, 1.4, 2.2))
-	lumiere(c + Vector3(1, 1.6, -3.5), Color(1.0, 0.6, 0.15), 2.6, 9.0)
+	Coffre.creer(self, c + Vector3(1, 0, -5), "legendaire", 0.0)
 	poser(DJ + "coin_stack_large.glb", c + Vector3(-1, 0, -4), 0.0, 1.4)
 	poser(DJ + "coin_stack_medium.glb", c + Vector3(3, 0, -3.6), 40.0, 1.4)
 	for p in [Vector3(-6, 0, 2), Vector3(6, 0, 3)]:
@@ -625,9 +623,7 @@ func _ossuaire() -> void:
 		cylindre(p, 0.9)
 	poser(HW + "shrine_candles.gltf", t + Vector3(-6, 0, 0), 90.0, 2.0)
 	cylindre(t + Vector3(-6, 0, 0), 1.6, 2.0)
-	poser(DJ + "chest_gold.glb", t + Vector3(-3.5, 0, 3.5), 90.0, 1.4)
-	boite(t + Vector3(-3.5, 0.6, 3.5), Vector3(1.4, 1.2, 2.4))
-	lumiere(t + Vector3(-2.5, 1.6, 3.5), Color(0.7, 0.4, 1.0), 2.2, 8.0)
+	Coffre.creer(self, t + Vector3(-3.5, 0, 3.5), "legendaire", 90.0)
 	lumiere(t + Vector3(0, 2.5, 0), vert, 2.6, 16.0, true)
 	for d in [[c + Vector3(-4, 0, -24), 1.1], [c + Vector3(8, 0, 24), 1.0], [c + Vector3(-20, 0, 18), 0.9], [c + Vector3(22, 0, -10), 0.9], [c + Vector3(-8, 0, 6), 0.8]]:
 		if dedans(Vector2(d[0].x, d[0].z), 1.0):
@@ -705,9 +701,7 @@ func _lac() -> void:
 			_cristal(p, turquoise, 0.8)
 	# une barque échouée et un coffre rare sur la rive nord : on le voit de l'autre côté de l'eau
 	poser(HW + "coffin.gltf", c + Vector3(6, 0, -12.5), 20.0, 1.2)
-	poser(DJ + "chest.glb", c + Vector3(-4, 0, -13), 10.0, 1.2)
-	boite(c + Vector3(-4, 0.5, -13), Vector3(1.6, 1.0, 1.3))
-	lumiere(c + Vector3(-4, 1.4, -12), Color(0.35, 0.6, 1.0), 1.8, 7.0)
+	Coffre.creer(self, c + Vector3(-4, 0, -13), "epique", 10.0)
 	lumiere(c + Vector3(0, 1.5, 0), Color(0.25, 0.7, 0.8), 1.5, 18.0)
 
 func _forges() -> void:
@@ -739,9 +733,7 @@ func _forges() -> void:
 	boite(e + Vector3(0, 0.8, 0), Vector3(3.4, 1.6, 1.6))
 	_feu(e + Vector3(-4, 0.4, -2), 1.6)
 	lumiere(e + Vector3(-4, 2.5, -2), lave, 3.2, 16.0, true)
-	poser(DJ + "chest_gold.glb", e + Vector3(4, 0, -4), 200.0, 1.6)
-	boite(e + Vector3(4, 0.6, -4), Vector3(2.6, 1.4, 2.2))
-	lumiere(e + Vector3(4, 1.6, -2.5), Color(1.0, 0.6, 0.15), 2.4, 8.0)
+	Coffre.creer(self, e + Vector3(4, 0, -4), "mythique", 0.0)
 
 ## Points d'arrivée : là où le Portail dépose les joueurs. Deux points éloignés pour que vingt joueurs
 ## ne s'entassent pas dans la même salle.
@@ -749,3 +741,18 @@ func _arrivees() -> void:
 	for p in ARRIVEES:
 		_anneau(p, 4.0, Color(0.5, 0.85, 1.0), 0.5)
 		lumiere(p + Vector3(0, 2.0, 0), Color(0.5, 0.8, 1.0), 1.0, 7.0)
+
+## Coffres communs et rares éparpillés, filons de minerai : de quoi occuper vingt joueurs.
+## Les filons rares sont au fond des ailes dangereuses (l'or près des forges).
+func _tresors() -> void:
+	for d in [[Vector3(-14, 0, -32), "commun"], [Vector3(46, 0, -36), "commun"], [Vector3(-34, 0, -60), "rare"], [Vector3(30, 0, -90), "rare"],
+			[Vector3(-108, 0, -40), "rare"], [Vector3(-84, 0, -84), "commun"], [Vector3(-100, 0, 14), "commun"], [Vector3(-64, 0, 10), "rare"],
+			[Vector3(36, 0, -130), "rare"], [Vector3(76, 0, -122), "commun"], [Vector3(6, 0, -70), "commun"], [Vector3(56, 0, -52), "epique"]]:
+		if dedans(Vector2(d[0].x, d[0].z), 2.0):
+			Coffre.creer(self, d[0], d[1], randf() * 360.0)
+	for d in [[Vector3(-2, 0, -32), "cuivre"], [Vector3(26, 0, -40), "cuivre"], [Vector3(-36, 0, -46), "cuivre"], [Vector3(10, 0, -88), "cuivre"],
+			[Vector3(-30, 0, -86), "fer"], [Vector3(48, 0, -78), "fer"], [Vector3(-76, 0, -66), "fer"], [Vector3(-108, 0, -74), "fer"],
+			[Vector3(-62, 0, -2), "fer"], [Vector3(-108, 0, -2), "argent"], [Vector3(-90, 0, -84), "argent"], [Vector3(40, 0, -100), "argent"],
+			[Vector3(72, 0, -146), "or"], [Vector3(36, 0, -146), "or"], [Vector3(70, 0, -116), "argent"], [Vector3(-48, 0, -64), "cuivre"]]:
+		if dedans(Vector2(d[0].x, d[0].z), 2.0):
+			Filon.creer(self, d[0], d[1])

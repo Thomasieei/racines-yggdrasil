@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 128 128">
+<defs><linearGradient id="cuir" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D9A066"/><stop offset="1" stop-color="#8A5A2B"/></linearGradient>
+<linearGradient id="or" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF1C4"/><stop offset="1" stop-color="#C77A22"/></linearGradient></defs>
+<path d="M44 34 C40 22 52 14 64 20 C76 14 88 22 84 34 Z" fill="url(#cuir)" stroke="#1A120A" stroke-width="5" stroke-linejoin="round"/>
+<path d="M42 38 C20 54 14 82 22 102 C30 120 98 120 106 102 C114 82 108 54 86 38 Z" fill="url(#cuir)" stroke="#1A120A" stroke-width="5" stroke-linejoin="round"/>
+<path d="M40 38 H88" stroke="#1A120A" stroke-width="12" stroke-linecap="round"/>
+<path d="M40 38 H88" stroke="url(#or)" stroke-width="6" stroke-linecap="round"/>
+<circle cx="64" cy="76" r="15" fill="url(#or)" stroke="#1A120A" stroke-width="4"/>
+<path d="M64 66 V86 M56 72 L64 66 L72 72" stroke="#1A120A" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M34 64 C30 76 30 90 36 100" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="5" fill="none" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 128 128">
+<defs><linearGradient id="or" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF1C4"/><stop offset="1" stop-color="#E0A040"/></linearGradient></defs>
+<path d="M40 112 C26 96 24 78 30 66 L36 54 C38 48 46 48 47 55 L48 62 L48 26 C48 18 60 18 60 26 L60 56 L62 20 C62 12 74 12 74 20 L74 56 L76 26 C76 18 88 18 88 26 L88 60 L90 40 C90 32 102 32 101 40 L98 78 C96 96 90 106 80 112 Z" fill="url(#or)" stroke="#1A120A" stroke-width="5" stroke-linejoin="round"/>
+</svg>

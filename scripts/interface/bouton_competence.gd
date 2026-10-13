@@ -92,7 +92,7 @@ func _contient(p: Vector2) -> bool:
 	return p.distance_to(centre_ecran()) <= diametre * 0.56
 
 func _input(event: InputEvent) -> void:
-	if heros == null:
+	if heros == null or Jeu.interface_bloquante:
 		return
 	if event is InputEventScreenTouch:
 		if event.pressed and _doigt == -1 and _contient(event.position):

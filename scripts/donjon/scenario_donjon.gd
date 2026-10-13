@@ -39,12 +39,49 @@ const CAMPS := [
 	["coulees", 80.0, [["mage", Vector3(40, 0, -141), 11.0], ["minion", Vector3(46, 0, -144), 9.0], ["minion", Vector3(42, 0, -134), 9.0]]],
 	["brokk", 240.0, [["brokk", Vector3(58, 0, -142), 9.0]]],
 	["forges_est", 70.0, [["arbaletrier", Vector3(74, 0, -140), 11.0], ["minion", Vector3(72, 0, -130), 9.0]]],
+	# densité supplémentaire : chaque passage entre deux zones a sa rencontre
+	["ouest_gouffre", 70.0, [["minion", Vector3(-12, 0, -64), 9.0], ["minion", Vector3(-8, 0, -68), 9.0], ["arbaletrier", Vector3(-16, 0, -70), 11.0]]],
+	["nord_ouest", 75.0, [["guerrier", Vector3(-20, 0, -84), 10.0], ["mage", Vector3(-14, 0, -90), 11.0]]],
+	["est_central", 70.0, [["guerrier", Vector3(40, 0, -58), 10.0], ["minion", Vector3(44, 0, -62), 9.0], ["minion", Vector3(36, 0, -64), 9.0]]],
+	["seuil_jarl", 80.0, [["guerrier", Vector3(58, 0, -66), 10.0], ["arbaletrier", Vector3(56, 0, -58), 11.0]]],
+	["ossuaire_sud", 75.0, [["minion", Vector3(-104, 0, -40), 9.0], ["minion", Vector3(-110, 0, -48), 9.0], ["guerrier", Vector3(-112, 0, -56), 10.0]]],
+	["ossuaire_nord", 75.0, [["arbaletrier", Vector3(-100, 0, -82), 11.0], ["minion", Vector3(-92, 0, -86), 9.0], ["minion", Vector3(-108, 0, -76), 9.0]]],
+	["lac_sud", 75.0, [["minion", Vector3(-84, 0, 18), 9.0], ["minion", Vector3(-94, 0, 18), 9.0], ["mage", Vector3(-100, 0, 12), 11.0]]],
+	["forges_ouest", 75.0, [["guerrier", Vector3(38, 0, -126), 10.0], ["minion", Vector3(36, 0, -134), 9.0], ["arbaletrier", Vector3(44, 0, -152), 11.0]]],
+	["forges_nord", 80.0, [["guerrier", Vector3(64, 0, -156), 10.0], ["arbaletrier", Vector3(72, 0, -150), 11.0]]],
 ]
+
+## Quêtes de Bjorn l'Égaré : courtes, claires, récompensées tout de suite.
+const QUETES := [
+	{"id": "rampants", "titre": "Chasse aux rampants", "texte": "Les rampants grouillent près du nid. Abats-en dix et je te paierai.", "evt": "tue", "filtre": "minion", "but": 10, "or": 150},
+	{"id": "cuivre", "titre": "Le cuivre des nains", "texte": "Rapporte-moi huit minerais de cuivre. Les filons brillent orange dans le noir.", "evt": "mine", "filtre": "minerai_cuivre", "but": 8, "or": 110, "xp_mine": 40},
+	{"id": "coffres", "titre": "Pilleur de tombes", "texte": "Les morts n'ont plus besoin de leurs coffres. Ouvres-en trois.", "evt": "coffre", "filtre": "", "but": 3, "or": 200},
+	{"id": "elite", "titre": "Tête couronnée", "texte": "Un Jarl, une Reine, un Forgeron déchu… abats l'un d'eux. Je t'offrirai un œuf que j'ai trouvé.", "evt": "tue", "filtre": "elite", "but": 1, "or": 400, "oeuf": "rare"},
+	{"id": "boss", "titre": "Le Roi sous la montagne", "texte": "Quand Ymir se lève, tout l'étage tremble. Aide à l'abattre.", "evt": "tue", "filtre": "boss", "but": 1, "or": 1200, "oeuf": "epique"},
+]
+
+const DELAI_BOSS := 180.0         ## premier réveil d'Ymir (prototype : 3 min ; en ligne : heure fixe)
+const ARENE_BOSS := Vector3(30, 0, -60)
+
+var _quete_i := 0
+var _quete_prog := 0
+var _quete_active := false
+var _boss_t := DELAI_BOSS
+var _boss: Node = null
+var _egare: Pnj
 
 const RAYON_ACTIF := 55.0          ## au-delà, un draugr ne pense ni ne s'anime (économie sur téléphone)
 const RAYON_DISCRET := 30.0        ## un camp ne se repeuple pas si un joueur est plus près que ça
 
 var _camps := {}
+var nav: NavCaverne
+
+## Aventuriers pilotés par l'IA (4 à 7) : pseudo, classe, tempérament (agressivité).
+const BOTS := [
+	["Ragnhild", "chevalier", 0.05], ["xX_Ulfr_Xx", "barbare", 0.55], ["Leif.le.Roux", "chevalier", 0.15],
+	["Astrid_77", "chevalier", 0.1], ["SkaldNoir", "barbare", 0.4], ["Bjarki", "chevalier", 0.25],
+	["Freydis", "barbare", 0.08], ["Toki42", "chevalier", 0.7],
+]
 var _horloge := 0.0
 var _lod_t := 0.0
 
@@ -85,13 +122,195 @@ func demarrer(p: Node, h: Heros, hd: CanvasLayer) -> void:
 	egare.position = Caverne.CAMP + Vector3(-3.5, 0, 1.0)
 	egare.rotation_degrees.y = 60.0
 	p.add_child.call_deferred(egare)
+	egare.marqueur = "!"
+	egare.activer_parole(_parler_bjorn)
+	_egare = egare
+	Jeu.ecouteurs.append(_sur_evenement)
+	Heros.jcj_actif = true
 	_minicarte()
+	if not "--sans-bots" in OS.get_cmdline_user_args():
+		_lancer_bots()
 	if "--test-repeuplement" in OS.get_cmdline_user_args():
 		_test_repeuplement()
+	if "--test-bots" in OS.get_cmdline_user_args():
+		_test_bots()
+	if "--test-quetes" in OS.get_cmdline_user_args():
+		_test_quetes()
+	if "--demo=bots" in OS.get_cmdline_user_args():
+		_demo_bots()
+	if "--test-jcj" in OS.get_cmdline_user_args():
+		_test_jcj()
 	hud.regler_titre("Étage 1 · Crypte des nains", "Donjon du jour · se referme dans 14:52")
-	recit.quete("Le donjon du jour", "Trouve la sortie de la crypte, au nord")
+	recit.quete("Le donjon du jour", "Trouve Bjorn au camp des Égarés (est de la caverne)")
 	await get_tree().create_timer(1.5).timeout
 	recit.voix("Freya", "Ici, je ne te vois presque plus. Reste près de la lumière.", 4.0)
+
+# ---------------- quêtes ----------------
+
+func _parler_bjorn(_h) -> void:
+	if _quete_active or _quete_i >= QUETES.size():
+		var q0: Dictionary = QUETES[mini(_quete_i, QUETES.size() - 1)]
+		recit.voix("Bjorn", "%s : %d / %d. Reviens quand c'est fait." % [q0["titre"], _quete_prog, q0["but"]] if _quete_active else "Je n'ai plus rien pour toi aujourd'hui. Le donjon change à minuit.", 3.5)
+		return
+	var q: Dictionary = QUETES[_quete_i]
+	Jeu.interface_bloquante = true
+	recit.dire("Bjorn l'Égaré", "marchand", [q["texte"]])
+	await recit.dialogue_fini
+	Jeu.interface_bloquante = false
+	_quete_active = true
+	_quete_prog = 0
+	_egare.regler_marqueur("")
+	recit.quete(q["titre"], "0 / %d" % q["but"])
+
+func _sur_evenement(nom: String, d: Dictionary) -> void:
+	if not _quete_active:
+		return
+	var q: Dictionary = QUETES[_quete_i]
+	if nom != q["evt"]:
+		return
+	match q["filtre"]:
+		"":
+			_quete_prog += 1
+		"elite":
+			if d.get("elite", false) and not d.get("boss", false) and d.get("joueur", false):
+				_quete_prog += 1
+		"boss":
+			if d.get("boss", false):
+				_quete_prog += 1
+		_:
+			if nom == "tue" and d.get("type", "") == q["filtre"] and d.get("joueur", false):
+				_quete_prog += 1
+			elif nom == "mine" and d.get("minerai", "") == q["filtre"]:
+				_quete_prog += d.get("qte", 1)
+	_quete_prog = mini(_quete_prog, q["but"])
+	recit.quete_objectif("%d / %d" % [_quete_prog, q["but"]])
+	if _quete_prog >= q["but"]:
+		_quete_active = false
+		var r := {"or": q["or"], "objets": []}
+		if q.has("oeuf"):
+			r["objets"].append(Objets.creer("oeuf", q["oeuf"]))
+		heros.ramasser(r, q["titre"])
+		if q.has("xp_mine"):
+			heros.gagner_xp_mine(q["xp_mine"])
+		recit.bandeau("Quête accomplie", q["titre"] + " — %d or" % q["or"], Color("#FFD34E"))
+		Sons.jouer("cloche", heros.global_position, 0.0, 1.2)
+		_quete_i += 1
+		if _quete_i < QUETES.size():
+			_egare.regler_marqueur("!")
+			recit.quete("Bjorn a autre chose pour toi", "Retourne au camp des Égarés")
+
+# ---------------- boss d'étage ----------------
+
+func _maj_boss(delta: float) -> void:
+	if _boss != null and is_instance_valid(_boss) and not _boss.est_mort:
+		hud.regler_titre(hud._titre.text, "Ymir est éveillé ! · %d %%" % int(100.0 * _boss.pv / _boss.pv_max), Color("#FF6A4A"))
+		return
+	if _boss != null:
+		# vaincu : prochain réveil plus tard
+		_boss = null
+		_boss_t = 600.0
+		recit.bandeau("Ymir est tombé", "Son trésor gît dans l'arène", Color("#FFD34E"))
+	_boss_t -= delta
+	var m := int(_boss_t) / 60
+	var sec := int(_boss_t) % 60
+	if _lieu == "crypte" or _lieu == "caverne" or _lieu == "":
+		hud.regler_titre(hud._titre.text, "Ymir, Roi des Draugr dans %d:%02d" % [m, sec], Color("#FFE2A0"))
+	if absf(_boss_t - 30.0) < delta:
+		recit.bandeau("La montagne gronde…", "Ymir se lève dans 30 secondes — Grande Caverne", Color("#FF9C8A"))
+		Sons.jouer("coup_lourd", heros.global_position, 2.0, 0.5)
+	if _boss_t <= 0.0:
+		_reveiller_boss()
+
+func _reveiller_boss() -> void:
+	var b := Draugr.new()
+	b.configurer("roi")
+	b.position = ARENE_BOSS
+	b.aggro_rayon = 16.0
+	b.camp_id = "boss"
+	principale.add_child(b)
+	_boss = b
+	Effets.onde(principale, ARENE_BOSS, 14.0, Color(1.0, 0.25, 0.1), 1.0)
+	Effets.poussiere(principale, ARENE_BOSS, 30)
+	recit.bandeau("Ymir, Roi des Draugr", "s'est éveillé au cœur de la Grande Caverne !", Color("#FF6A4A"))
+	Sons.jouer("cloche", heros.global_position, 4.0, 0.5)
+	var cam := get_viewport().get_camera_3d()
+	if cam and cam.has_method("secouer"):
+		cam.secouer(1.2)
+	if hud.minicarte:
+		hud.minicarte.lieux.append({"c": Vector2(ARENE_BOSS.x, ARENE_BOSS.z), "genre": "elite"})
+
+# ---------------- aventuriers IA ----------------
+
+func preparer() -> void:
+	if nav != null:
+		return
+	nav = NavCaverne.new()
+	await nav.construire(get_tree(), principale.get_world_3d(), 6000)
+
+func _lancer_bots() -> void:
+	await get_tree().create_timer(1.0).timeout
+	if nav == null:
+		await preparer()
+	while not nav.pret:
+		await get_tree().process_frame
+	var noms := BOTS.duplicate()
+	noms.shuffle()
+	var n := randi_range(4, 7)
+	# deux qui arrivent avec le joueur (on les voit tout de suite), les autres déjà dans la grotte
+	var departs: Array = [Vector3(10, 0, 12), Vector3(18, 0, 16)]
+	var ailleurs: Array = [Caverne.CAMP, Caverne.PUITS, Vector3(-20, 0, -40), Vector3(40, 0, -100), Vector3(-60, 0, -10), Vector3(0, 0, -70), Vector3(60, 0, -60)]
+	ailleurs.shuffle()
+	for i in n:
+		var pos: Vector3 = departs[i] if i < departs.size() else ailleurs[(i - departs.size()) % ailleurs.size()]
+		_creer_bot(noms[i], pos, i == 3)
+		await get_tree().create_timer(0.35).timeout
+
+func _creer_bot(fiche: Array, pos: Vector3, avec_dragon := false) -> Bot:
+	var b := Heros.new()
+	b.ia = true
+	b.nom_joueur = fiche[0]
+	b.classe_modele = Heros.CHEVALIER if fiche[1] == "chevalier" else Heros.MODELE
+	b.name = "Bot_" + str(fiche[0]).validate_node_name()
+	var c := nav.centre(nav.libre_pres(pos))
+	b.position = c + Vector3(randf_range(-0.4, 0.4), 0.1, randf_range(-0.4, 0.4))
+	principale.add_child(b)
+	b.add_to_group("interactif")
+	# équipement de départ : une arme, un peu d'or, des potions, parfois un dragon
+	var arme := Objets.creer(Objets.ARMES[randi() % 4], Objets.tirer_rarete([0.6, 0.32, 0.07, 0.01, 0]))
+	b.sac.arme = arme
+	b.sac.ajouter_or(randi_range(20, 260))
+	b.sac.ajouter(Objets.creer("potion", "commun", randi_range(0, 2)))
+	if randf() < 0.5:
+		b.sac.ajouter(Objets.creer(["minerai_cuivre", "minerai_fer", "tissu"][randi() % 3], "commun", randi_range(2, 8)))
+	b.metier_mine["niveau"] = randi_range(1, 7)
+	b.niveau = randi_range(8, 16)
+	if avec_dragon:
+		var d := Objets.eclore(Objets.creer("oeuf", "commun"))
+		b.equiper_dragon(d)
+	var cerveau := Bot.new()
+	cerveau.h = b
+	cerveau.nav = nav
+	cerveau.scenario = self
+	cerveau.agressivite = fiche[2]
+	cerveau.prudence = randf_range(0.35, 0.6)
+	cerveau.adresse = randf_range(0.45, 0.85)
+	cerveau.add_to_group("bot_cerveau")
+	cerveau.set_meta("fiche", fiche)
+	add_child(cerveau)
+	return cerveau
+
+## Un aventurier IA est tombé : il revient du sanctuaire un peu plus tard, les poches vides.
+func bot_mort(cerveau: Bot) -> void:
+	var fiche: Array = cerveau.get_meta("fiche")
+	var ancien := cerveau.h
+	await get_tree().create_timer(randf_range(35.0, 80.0)).timeout
+	if is_instance_valid(cerveau):
+		cerveau.queue_free()
+	if is_instance_valid(ancien):
+		ancien.queue_free()
+	if not is_inside_tree():
+		return
+	_creer_bot(fiche, Caverne.ARRIVEES[randi() % Caverne.ARRIVEES.size()])
 
 func _gardienne(pos: Vector3, nom: String, rot: float) -> void:
 	var g := Pnj.new()
@@ -143,7 +362,7 @@ func _repeupler(delta: float) -> void:
 
 ## Les draugr loin de tout joueur dorment vraiment : ni IA, ni animation, ni dessin.
 func _economie() -> void:
-	var hs := _heros_tous()
+	var hs := _heros_tous().filter(func(x): return x.is_physics_processing())
 	for d in get_tree().get_nodes_in_group("monstre"):
 		if d.est_mort or not d is Draugr:
 			continue
@@ -191,6 +410,7 @@ func _minicarte() -> void:
 func _process(_d: float) -> void:
 	if heros == null or not is_instance_valid(heros):
 		return
+	_maj_boss(_d)
 	_lod_t -= _d
 	if _lod_t <= 0.0:
 		_lod_t = 0.4
@@ -242,4 +462,128 @@ func _test_repeuplement() -> void:
 		var actifs := get_tree().get_nodes_in_group("monstre").filter(func(d): return not d.est_mort and d.is_physics_processing()).size()
 		var total := get_tree().get_nodes_in_group("monstre").filter(func(d): return not d.est_mort).size()
 		printerr("TEST t+", t, " camp est vivants=", n, " draugr actifs=", actifs, "/", total)
+	get_tree().quit()
+
+func _test_bots() -> void:
+	heros.invulnerable_t = 1e9
+	var t0 := Time.get_ticks_msec()
+	while nav == null or not nav.pret:
+		await get_tree().process_frame
+	printerr("TEST nav prête en ", Time.get_ticks_msec() - t0, " ms (dont 1 s d'attente)")
+	for i in 8:
+		await get_tree().create_timer(13.0).timeout
+		var somme := 0.0
+		var pire := 0.0
+		for f in 120:
+			await get_tree().physics_frame
+			var v := Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
+			somme += v
+			pire = maxf(pire, v)
+		printerr("TEST physique moyenne=", snappedf(somme / 120.0, 0.01), " ms pire=", snappedf(pire, 0.01), " ms")
+		var tues := 0
+		for c in get_tree().get_nodes_in_group("bot_cerveau"):
+			var b: Heros = c.h
+			printerr("TEST t=", (i + 1) * 15, " ", b.nom_joueur, " reel=", c.reel, " etat=", c.etat, " obj=", c.objectif.get("genre", "-"), "/", c.objectif.get("camp", ""), " pos=", Vector3i(b.global_position), " pv=", int(b.pv), " sac=", b.sac.valeur(), " mort=", b.est_mort, " afk=", c.afk)
+		var actifs := get_tree().get_nodes_in_group("monstre").filter(func(d): return not d.est_mort and d.is_physics_processing()).size()
+		printerr("TEST draugr actifs=", actifs, " fps=", Engine.get_frames_per_second(), " ms_phys=", snappedf(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0, 0.01), " ms_proc=", snappedf(Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, 0.01))
+	get_tree().quit()
+
+func _cap(nom: String) -> void:
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png("/tmp/claude-0/scr/jcj_%s.png" % nom)
+
+func _test_jcj() -> void:
+	while nav == null or not nav.pret:
+		await get_tree().process_frame
+	await get_tree().create_timer(4.0).timeout
+	heros.global_position = Vector3(14, 0.1, -6)
+	var cerveaux := get_tree().get_nodes_in_group("bot_cerveau")
+	var i := 0
+	for c in cerveaux:
+		if i < 3:
+			c.h.global_position = Vector3(11 + i * 3, 0.1, -9 - i)
+			c.objectif = {}
+		i += 1
+	await get_tree().create_timer(1.0).timeout
+	_cap("1_voisins")
+	var pillard: Bot = cerveaux[0]
+	pillard.h.declarer_hostile(heros)
+	var pv0 := heros.pv
+	await get_tree().create_timer(5.0).timeout
+	_cap("2_attaque")
+	printerr("TEST pv joueur ", int(pv0), " -> ", int(heros.pv), " ; pillard à ", snappedf(pillard.h.global_position.distance_to(heros.global_position), 0.1), " m")
+	var avant := heros.sac.valeur()
+	pillard.h.recevoir({"montant": 1e6, "source": heros})
+	await get_tree().create_timer(1.5).timeout
+	printerr("TEST sac joueur avant=", avant, " après=", heros.sac.valeur(), " (butin du pillard)")
+	_cap("3_pillard_tombe")
+	# boss
+	heros.invulnerable_t = 1e9
+	heros.global_position = ARENE_BOSS + Vector3(0, 0.1, 13)
+	_boss_t = 0.3
+	await get_tree().create_timer(4.0).timeout
+	_cap("4_boss")
+	if _boss:
+		_boss.cible = heros
+		_boss.reveiller(heros)
+		await get_tree().create_timer(4.0).timeout
+		_cap("5_boss_attaque")
+		_boss.pv = _boss.pv_max * 0.45
+		_boss.recevoir({"montant": 10.0, "source": heros})
+		await get_tree().create_timer(2.0).timeout
+		_cap("6_boss_rage")
+		printerr("TEST boss pv=", int(_boss.pv), "/", int(_boss.pv_max), " etat=", _boss.etat)
+	get_tree().quit()
+
+func _test_quetes() -> void:
+	await get_tree().create_timer(2.0).timeout
+	printerr("TEST Bjorn interactif=", _egare.is_in_group("interactif"), " action=", _egare.texte_action())
+	var evts := [["tue", {"type": "minion", "joueur": true}, 10], ["mine", {"minerai": "minerai_cuivre", "qte": 3}, 3],
+		["coffre", {}, 3], ["tue", {"type": "jarl", "joueur": true, "elite": true}, 1], ["tue", {"type": "roi", "boss": true, "elite": true}, 1]]
+	for e in evts:
+		_quete_active = true
+		_quete_prog = 0
+		var i0 := _quete_i
+		var or0 := heros.sac.or_
+		for k in e[2]:
+			Jeu.evenement(e[0], e[1])
+		printerr("TEST quête ", QUETES[i0]["id"], " finie=", _quete_i > i0, " or +", heros.sac.or_ - or0, " oeufs=", heros.sac.compter("oeuf"))
+	get_tree().quit()
+
+## Démonstration filmée : le héros joue tout seul (farm, coffres, filons) au milieu des autres aventuriers ;
+## un pillard l'attaque, puis Ymir se réveille.
+func _demo_bots() -> void:
+	_boss_t = 999.0
+	while nav == null or not nav.pret:
+		await get_tree().process_frame
+	heros.sac.ajouter(Objets.creer("potion", "commun", 6))
+	heros.set_meta("pilote_auto", true)
+	var pilote := Bot.new()
+	pilote.h = heros
+	pilote.nav = nav
+	pilote.scenario = self
+	pilote.agressivite = 0.0
+	pilote.adresse = 0.9
+	add_child(pilote)
+	pilote._t_afk = 1e9
+	pilote.objectif = {"genre": "objet", "noeud": null, "pos": Vector3(12, 0, -12)}
+	pilote._aller_vers(Vector3(12, 0, -12))
+	await get_tree().create_timer(38.0).timeout
+	var proche: Bot = null
+	for c in get_tree().get_nodes_in_group("bot_cerveau"):
+		if not c.h.est_mort and (proche == null or c.h.global_position.distance_to(heros.global_position) < proche.h.global_position.distance_to(heros.global_position)):
+			proche = c
+	if proche:
+		proche.h.global_position = nav.centre(nav.libre_pres(heros.global_position + Vector3(6, 0, 4)))
+		proche.h.declarer_hostile(heros)
+	await get_tree().create_timer(24.0).timeout
+	# fondu vers l'arène : Ymir se lève
+	heros.global_position = nav.centre(nav.libre_pres(ARENE_BOSS + Vector3(0, 0, 13)))
+	pilote.objectif = {"genre": "attente", "pos": heros.global_position}
+	pilote._chemin = PackedVector3Array()
+	_boss_t = 2.5
+	await get_tree().create_timer(5.0).timeout
+	pilote.objectif = {"genre": "camp", "camp": "", "pos": ARENE_BOSS}
+	pilote._aller_vers(ARENE_BOSS)
+	await get_tree().create_timer(22.0).timeout
 	get_tree().quit()

@@ -132,7 +132,7 @@ func _boite(pos: Vector3, taille: Vector3) -> void:
 
 func _decor() -> void:
 	# point focal : coffre doré sur l'axe de la sortie, encadré de bannières et de bougies
-	_poser("chest_gold", Vector3(14, 0, 5.2), 0.0, 1.15)
+	Coffre.creer(self, Vector3(14, 0, 5.2), "rare", 0.0)
 	_poser("candle_triple", Vector3(11.4, 0, 4.2), 0.0, 1.2, false)
 	_poser("candle_triple", Vector3(16.6, 0, 4.2), 0.0, 1.2, false)
 	_poser("banner_patternA_red", Vector3(9, 0, 0.5), 0.0, 1.0, false)

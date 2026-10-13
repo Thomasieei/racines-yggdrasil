@@ -21,10 +21,18 @@ Donjon d'extraction mobile (Godot 4.3, paysage). Un donjon du jour partagé, Fre
    - **Ossuaire des Rois** (ouest) : allées de tombes, garde royale, trône de **Sigrid la Pâle** (élite qui relève les morts), **camp du Puits** (zone sûre et second point d'arrivée).
    - **Lac des Noyés** (sud-ouest) : lac noir infranchissable, noyés sur les rives, coffre sur la berge nord.
    - **Forges englouties** (nord-est) : ruines naines, coulées de lave, enclume de **Brokk le Déchu** (élite).
-   - 25 camps, environ 60 draugr. Un camp vidé se repeuple après 1 à 4 minutes, jamais sous les yeux d'un joueur. Les draugr loin de tout joueur sont mis en sommeil (ni IA ni animation) pour garder le téléphone fluide.
-8. Mourir ramène au sanctuaire.
+   - 34 camps, plus de 80 draugr. Un camp vidé se repeuple après 1 à 4 minutes, jamais sous les yeux d'un joueur. Les draugr loin de tout joueur sont mis en sommeil (ni IA ni animation) pour garder le téléphone fluide.
+8. **Ymir, Roi des Draugr** (boss d'étage) se réveille au cœur de la Grande Caverne au bout de 3 minutes (compte à rebours sous le titre, alerte 30 s avant) : trois fois la taille d'un draugr, 14 000 PV, aura rouge, invoque des morts, entre en rage sous 50 %. Il revient 10 minutes après sa mort.
+9. **Quêtes de Bjorn l'Égaré** (camp des Égarés, bouton « Parler ») : rampants, cuivre, coffres, un élite, puis Ymir. Récompenses en or et en œufs de dragon.
+10. **Coffres** (commun → mythique) : on les ouvre (1,4 s), une fenêtre montre le vrai contenu (or, armes, minerais, potions, parfois un œuf). **Filons** (cuivre, fer, argent, or) : on mine (2,2 s), le métier **Mineur** monte de niveau et débloque les filons rares.
+11. **Œufs de dragon** : rares. Dans le sac, « Faire éclore » : le bébé est commun, rare, épique, légendaire ou mythique (au-delà du bleu, c'est extrêmement rare) avec 1 à 5 étoiles de puissance. On l'équipe comme **acolyte** (il crache du feu et grandit en gagnant de l'expérience) ou on le revend au marchand.
+12. **Sac** (bouton en haut à droite, ou B) : 30 cases, arme et acolyte équipés, valeur de ce qu'on risque. **Tout ce qu'on porte est perdu à la mort** : si un autre aventurier nous tue, il prend tout ; sinon tout reste sur la dépouille, que n'importe qui peut fouiller.
+13. **Autres aventuriers (IA)** : 4 à 7 joueurs simulés en attendant le vrai multijoueur. Ils farment les camps, minent, ouvrent les coffres, boivent leurs potions, partent parfois AFK… et certains attaquent quand on est affaibli. Pseudo bleu = neutre, rouge = hostile. On peut aussi les attaquer (hors zones sûres) et leur prendre leur sac.
+14. Mourir ramène au sanctuaire.
 
-Pas encore branchés : menus du marchand et de la forge, sac et inventaire en jeu, coffres et butin, corps à récupérer, multijoueur.
+Pas encore branchés : menus du marchand et de la forge (la vente du sac marche près d'un marchand), vrai multijoueur en ligne.
+
+Le bébé dragon et l'œuf sont dessinés par le jeu (aucun pack de la banque ne contient de dragon) : c'est une version provisoire, à remplacer par un vrai modèle animé.
 
 ## Commandes
 
@@ -37,6 +45,8 @@ Pas encore branchés : menus du marchand et de la forge, sac et inventaire en je
 | Bouton de roulade | Espace |
 | Toucher la minicarte : guidage vers le Bourg | clic sur la minicarte |
 | Toucher le dialogue : continuer | Entrée |
+| Bouton main (à droite) : ouvrir, miner, fouiller, parler | E |
+| Bouton sac | B ou I |
 
 Sorts du barbare : Fendoir (cône), Bond du berserker (saut), Ruée runique (incantation puis ruée qui étourdit), Bulle de Freya, Pas du vent, Potion, Roulade.
 
@@ -46,6 +56,8 @@ Sorts du barbare : Fendoir (cône), Bond du berserker (saut), Ruée runique (inc
 - Combat : `scripts/combat/` (héros, draugr, zones, télégraphes au sol, effets, sons, zones sûres).
 - Carte de surface : `scripts/surface/` (carte, PNJ, scénario de Freya, guidage) ; donjon : `scripts/donjon/` (caverne, scénario) et `scripts/salle_entree.gd` (crypte).
 - Interface : `scripts/interface/`.
-- Options de lancement utiles (après `--`) : `--carte=crypte`, `--sans-intro`, `--depart=arche`, `--demo=combat`, `--demo=surface`, `--demo=donjon`, `--plan=fichier.png`.
+- Objets, sac, coffres, filons, œufs : `scripts/objets/`. Aventuriers IA : `scripts/combat/bot.gd` (cerveau) et `scripts/donjon/nav_caverne.gd` (grille de déplacement).
+- Options de lancement utiles (après `--`) : `--carte=crypte`, `--sans-intro`, `--depart=arche`, `--sans-bots`, `--demo=combat`, `--demo=surface`, `--demo=donjon`, `--demo=bots`, `--plan=fichier.png`.
+- Tests : `--test-bots`, `--test-jcj`, `--test-quetes`, `--test-objets`, `--test-repeuplement`.
 
 Assets : packs KayKit et Kenney (CC0), détail dans `LICENCES.md`.

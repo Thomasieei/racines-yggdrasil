@@ -80,6 +80,15 @@ func _dessiner() -> void:
 			pc = o + dc.normalized() * (rayon_px - 10.0)
 		var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.006)
 		_dessin.draw_arc(pc, 7.0 + pulse * 3.0, 0, TAU, 24, Color(1.0, 0.85, 0.4, 0.9 - pulse * 0.5), 2.0, true)
+	# autres aventuriers (bleu ; rouge s'ils nous sont hostiles) — seulement à portée de vue
+	for b in get_tree().get_nodes_in_group("joueur"):
+		if b == heros or b.est_mort or not b.is_physics_processing():
+			continue
+		var pb := _vers_ecran(Vector2(b.global_position.x, b.global_position.z), c)
+		if pb.distance_to(o) < rayon_px - 4.0:
+			var hostile: bool = heros.get("hostiles") != null and heros.hostiles.has(b)
+			_dessin.draw_circle(pb, 3.4, Color(0, 0, 0, 0.7))
+			_dessin.draw_circle(pb, 2.5, Color("#FF4A3D") if hostile else Color("#6FB8FF"))
 	# flèche du héros : orientée selon son regard
 	var ang: float = heros.rotation.y
 	var av := Vector2(sin(ang), cos(ang))

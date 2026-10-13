@@ -29,6 +29,22 @@ var _marque: Label3D
 var _proche := false
 var _t := 0.0
 var _frappe_t := 0.0
+var on_parler: Callable                ## si défini : le PNJ propose « Parler »
+var rayon := 3.6
+
+func activer_parole(f: Callable) -> void:
+	on_parler = f
+	add_to_group("interactif")
+
+func texte_action() -> String:
+	return "Parler"
+
+func disponible() -> bool:
+	return on_parler.is_valid()
+
+func interagir(h) -> void:
+	if on_parler.is_valid():
+		on_parler.call(h)
 
 func _ready() -> void:
 	add_to_group("pnj")
@@ -136,5 +152,7 @@ func _garder(delta: float) -> void:
 		return
 
 func _heros() -> Node3D:
+	if Jeu.joueur and is_instance_valid(Jeu.joueur):
+		return Jeu.joueur
 	var l := get_tree().get_nodes_in_group("joueur")
 	return l[0] if not l.is_empty() else null

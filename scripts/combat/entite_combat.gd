@@ -103,8 +103,12 @@ func recevoir(d: Dictionary) -> void:
 		pv = maxf(0.0, pv - montant)
 		pv_change.emit(pv, pv_max)
 		_flash()
-		var couleur := Color("#FF6A5A") if camp == "joueur" else (Color("#FFD36B") if crit else Color.WHITE)
-		Effets.nombre(get_parent(), global_position, str(int(round(montant))) + ("!" if crit else ""), couleur, crit, "subi" if camp == "joueur" else "")
+		# chiffres : seulement ce qui concerne le joueur (ses coups, ses blessures), sinon l'écran se noie
+		var moi: bool = self == Jeu.joueur
+		var par_moi: bool = source != null and (source == Jeu.joueur or source.get("maitre") == Jeu.joueur)
+		if moi or par_moi or (source == null and get("ia") != true) or (source != null and not source is Heros and get("ia") != true and source.get("maitre") == null):
+			var couleur := Color("#FF6A5A") if moi else (Color("#FFD36B") if crit else Color.WHITE)
+			Effets.nombre(get_parent(), global_position, str(int(round(montant))) + ("!" if crit else ""), couleur, crit, "subi" if moi else "")
 		Effets.etincelles(get_parent(), global_position + Vector3(0, 1.1, 0), (global_position - origine).normalized() + Vector3(0, 0.6, 0), Color(1.0, 0.85, 0.6) if camp != "joueur" else Color(1.0, 0.35, 0.3), 12 if not crit else 22)
 		_reaction_coup(d)
 	# contrôles, avec immunité courte après un étourdissement

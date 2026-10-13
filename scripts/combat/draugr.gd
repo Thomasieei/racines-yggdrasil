@@ -79,6 +79,23 @@ const TYPES := {
 			 "portee_min": 5.0, "portee_max": 10.0, "bond": true, "etourdir": 0.8},
 		],
 	},
+	"roi": {
+		"nom": "Ymir, Roi des Draugr", "modele": "squelette_warrior.glb", "arme_d": "skeleton_axe.glb", "arme_g": "skeleton_shield_large_a.glb",
+		"pv": 14000.0, "vitesse": 2.7, "echelle": 2.9, "portee": 5.0, "garde": 0.0, "armure": true, "elite": true, "boss": true,
+		"attaques": [
+			{"id": "fendre", "forme": "cone", "rayon": 7.0, "angle": 1.1, "prep": 1.25, "degats": 380.0,
+			 "anim": "2H_Melee_Attack_Chop", "impact_anim": 0.62, "recup": 1.0, "cd": 2.6, "son": "coup_lourd"},
+			{"id": "seisme", "forme": "cercle", "rayon": 10.0, "angle": 0.0, "prep": 2.1, "degats": 460.0,
+			 "anim": "2H_Melee_Attack_Spin", "impact_anim": 0.9, "recup": 1.6, "cd": 11.0, "son": "atterrissage",
+			 "sur_soi": true, "etourdir": 1.0, "portee_min": 0.0, "portee_max": 9.0},
+			{"id": "invocation", "forme": "cercle", "rayon": 3.0, "angle": 0.0, "prep": 1.4, "degats": 0.0,
+			 "anim": "Spellcast_Raise", "impact_anim": 1.2, "recup": 1.0, "cd": 22.0, "son": "verre_lourd",
+			 "sur_soi": true, "invoque": 4, "portee_min": 0.0, "portee_max": 30.0},
+			{"id": "saut", "forme": "cercle", "rayon": 5.5, "angle": 0.0, "prep": 1.5, "degats": 420.0,
+			 "anim": "1H_Melee_Attack_Jump_Chop", "impact_anim": 0.72, "recup": 1.5, "cd": 12.0, "son": "atterrissage",
+			 "portee_min": 9.0, "portee_max": 18.0, "bond": true, "etourdir": 0.8},
+		],
+	},
 	"mage": {
 		"nom": "Draugr nécromant", "modele": "squelette_mage.glb", "arme_d": "skeleton_staff.glb", "arme_g": "",
 		"pv": 240.0, "vitesse": 2.7, "echelle": 1.0, "portee": 10.0, "garde": 6.0, "armure": false,
@@ -140,6 +157,8 @@ func _ready() -> void:
 		_cds[a["id"]] = randf_range(0.2, 0.8)
 	_flottement = randf_range(-1.0, 1.0)
 	_foyer = global_position
+	if fiche.get("elite", false):
+		_aura(fiche.get("boss", false))
 	if fiche.get("enterre", false):
 		# les rampants dorment sous terre : ils surgiront quand la meute s'éveille
 		jouer("Spawn_Ground_Skeletons", 0.0, 0.0)
@@ -203,7 +222,7 @@ func reveiller(c: EntiteCombat) -> void:
 ## Le héros entre dans le rayon, ou un allié proche s'éveille, ou on se fait frapper.
 func _verifier_aggro() -> void:
 	for h in get_tree().get_nodes_in_group("joueur"):
-		if not h.est_mort and global_position.distance_to(h.global_position) < aggro_rayon and not ZoneSure.contient(h.global_position):
+		if not h.est_mort and h.is_physics_processing() and global_position.distance_to(h.global_position) < aggro_rayon and not ZoneSure.contient(h.global_position):
 			reveiller(h)
 			return
 
@@ -224,6 +243,9 @@ func _choisir_attaque(dist: float) -> Dictionary:
 	return meilleure
 
 func _preparer(a: Dictionary) -> void:
+	if enrage:
+		a = a.duplicate()
+		a["prep"] = a["prep"] * 0.78
 	_attaque = a
 	attaques_lancees += 1
 	etat = "prepare"
@@ -302,6 +324,85 @@ func _impact() -> void:
 			_tirer_carreau(degats, a["rayon"])
 			Sons.jouer("elan", global_position, -2.0, 1.4)
 
+var _aura_noeud: Node3D
+var _aura_mat: ShaderMaterial
+var enrage := false
+
+## Aura des élites et du boss : anneau rouge qui tourne au sol, braises qui montent, lueur. On voit le
+## danger de loin, et la taille de l'aura dit la puissance.
+func _aura(boss: bool) -> void:
+	_aura_noeud = Node3D.new()
+	add_child(_aura_noeud)
+	var r := 4.5 if boss else 2.4
+	var plan := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(r * 2.0, r * 2.0)
+	plan.mesh = pm
+	_aura_mat = ShaderMaterial.new()
+	_aura_mat.shader = load("res://shaders/anneau_sol.gdshader")
+	_aura_mat.set_shader_parameter("couleur", Color(1.0, 0.25, 0.12) if boss else Color(1.0, 0.55, 0.15))
+	_aura_mat.set_shader_parameter("rayon", 0.92)
+	_aura_mat.set_shader_parameter("alpha", 0.55 if boss else 0.35)
+	_aura_mat.set_shader_parameter("runes", 1.0)
+	plan.material_override = _aura_mat
+	plan.position.y = 0.06
+	plan.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_aura_noeud.add_child(plan)
+	var p := CPUParticles3D.new()
+	p.amount = 40 if boss else 14
+	p.lifetime = 1.8
+	var q := QuadMesh.new()
+	q.size = Vector2(0.3, 0.3)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.disable_fog = true
+	m.albedo_texture = load("res://assets/vfx/spark_05.png")
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.vertex_color_use_as_albedo = true
+	q.material = m
+	p.mesh = q
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
+	p.emission_ring_radius = r * 0.85
+	p.emission_ring_inner_radius = r * 0.4
+	p.emission_ring_height = 0.1
+	p.emission_ring_axis = Vector3.UP
+	p.direction = Vector3.UP
+	p.spread = 15.0
+	p.gravity = Vector3(0, 1.5, 0)
+	p.initial_velocity_min = 0.6
+	p.initial_velocity_max = 1.8
+	p.color = Color(1.0, 0.4, 0.15)
+	var rampe := Gradient.new()
+	rampe.set_color(0, Color(1, 1, 1, 0))
+	rampe.add_point(0.2, Color(1, 1, 1, 1))
+	rampe.set_color(1, Color(1, 1, 1, 0))
+	p.color_ramp = rampe
+	p.local_coords = false
+	_aura_noeud.add_child(p)
+	var l := OmniLight3D.new()
+	l.light_color = Color(1.0, 0.3, 0.15)
+	l.light_energy = 2.5 if boss else 1.2
+	l.omni_range = r * 2.2
+	l.position.y = 2.0 if boss else 1.2
+	_aura_noeud.add_child(l)
+
+func _maj_aura(delta: float) -> void:
+	if _aura_noeud == null:
+		return
+	_aura_noeud.rotation.y += delta * (1.4 if enrage else 0.6)
+	_aura_noeud.visible = etat != "dort" or not fiche.get("enterre", false)
+	if fiche.get("boss", false) and not enrage and pv < pv_max * 0.5:
+		enrage = true
+		vitesse *= 1.3
+		_aura_noeud.scale = Vector3.ONE * 1.35
+		_aura_mat.set_shader_parameter("alpha", 0.85)
+		Effets.onde(get_parent(), global_position, 12.0, Color(1.0, 0.2, 0.1), 0.8)
+		Effets.flash_lumiere(get_parent(), global_position, Color(1.0, 0.2, 0.1), 6.0, 20.0, 0.6)
+		Sons.jouer("cloche", global_position, 4.0, 0.6)
+		Jeu.notifier(nom_affiche() + " entre en rage !", Color("#FF5A3A"))
+
 ## La Reine pâle relève des rampants autour d'elle (ils sortent de terre déjà éveillés).
 func _invoquer(n: int) -> void:
 	Effets.onde(get_parent(), global_position, 3.5, Color(0.4, 1.0, 0.55), 0.6)
@@ -377,11 +478,21 @@ func interrompre() -> void:
 		if anim:
 			anim.speed_scale = 1.0
 
+var _dernier_tueur: Node = null
+
 func recevoir(d: Dictionary) -> void:
+	if fiche.get("boss", false) and d.get("etourdir", 0.0) > 0.0:
+		d = d.duplicate()
+		d["etourdir"] = d["etourdir"] * 0.35
+	var s0 = d.get("source", null)
+	if s0 != null and is_instance_valid(s0):
+		_dernier_tueur = s0.get("maitre") if s0.get("maitre") != null else s0
 	if etat == "dort":
 		var s = d.get("source", null)
 		if s:
 			reveiller(s)
+	elif s0 is Heros and not _cible_touchable():
+		cible = s0
 	super.recevoir(d)
 
 func _reaction_coup(d: Dictionary) -> void:
@@ -407,6 +518,26 @@ func _mourir() -> void:
 	if anim:
 		anim.speed_scale = 1.0
 	jouer("Death_C_Skeletons", 0.08, 1.0, 99.0)
+	if _aura_noeud:
+		_aura_noeud.visible = false
+	var par_joueur: bool = _dernier_tueur != null and is_instance_valid(_dernier_tueur) and _dernier_tueur == Jeu.joueur
+	Jeu.evenement("tue", {"type": type, "joueur": par_joueur, "elite": fiche.get("elite", false), "boss": fiche.get("boss", false)})
+	# butin : une bourse au sol (souvent un peu d'or, parfois un objet, très rarement un œuf)
+	if fiche.get("boss", false):
+		var bb := {"or": randi_range(600, 900), "objets": [Objets.creer(Objets.ARMES[randi() % Objets.ARMES.size()], Objets.tirer_rarete([0, 0, 0.4, 0.45, 0.15])),
+			Objets.creer(Objets.ARMES[randi() % Objets.ARMES.size()], Objets.tirer_rarete([0, 0.2, 0.5, 0.25, 0.05])),
+			Objets.creer("lingot_or", "commun", randi_range(3, 6))]}
+		if randf() < 0.45:
+			bb["objets"].append(Objets.creer("oeuf", Objets.tirer_rarete([0.1, 0.45, 0.3, 0.12, 0.03])))
+		Depouille.creer(get_parent(), global_position, bb)
+	elif not invoque:
+		var b := Objets.butin_monstre(type)
+		if b["or"] > 0 or not b["objets"].is_empty():
+			Depouille.creer(get_parent(), global_position + Vector3(randf_range(-0.5, 0.5), 0, randf_range(-0.5, 0.5)), b)
+	# l'acolyte du tueur gagne de l'expérience
+	var src = _dernier_tueur
+	if src != null and is_instance_valid(src) and src.has_method("xp_acolyte"):
+		src.xp_acolyte(30 if not fiche.get("elite", false) else 300)
 	Sons.jouer("coup_os", global_position, 0.0, 0.6)
 	Effets.etincelles(get_parent(), global_position + Vector3(0, 1.0, 0), Vector3.UP, Color(0.85, 0.95, 1.0), 16, 3.5, "magic_02.png", 0.35)
 	for e in get_children():
@@ -421,6 +552,7 @@ func _mourir() -> void:
 
 func _physics_process(delta: float) -> void:
 	_process_etats(delta)
+	_maj_aura(delta)
 	_hit_t = maxf(0.0, _hit_t - delta)
 	for k in _cds:
 		_cds[k] = maxf(0.0, _cds[k] - delta)
@@ -495,11 +627,24 @@ func _alerter_meute() -> void:
 		if a != self and a is Draugr and a.etat == "dort" and a.global_position.distance_to(global_position) < 8.0:
 			a.reveiller(cible)
 
+## La cible est tombée : on se jette sur l'aventurier le plus proche, sinon on rentre.
+func _nouvelle_cible() -> bool:
+	var meilleur: Node = null
+	var dmin := maxf(aggro_rayon, 10.0) * 1.4
+	for h in get_tree().get_nodes_in_group("joueur"):
+		if h.est_mort or not h.is_physics_processing() or ZoneSure.contient(h.global_position):
+			continue
+		var d := global_position.distance_to(h.global_position)
+		if d < dmin:
+			dmin = d
+			meilleur = h
+	cible = meilleur
+	return meilleur != null
+
 func _poursuivre(delta: float) -> void:
-	if not _cible_touchable():
+	if not _cible_touchable() and not _nouvelle_cible():
+		etat = "retour"
 		velocity = Vector3.ZERO
-		jouer("Idle_Combat", 0.2)
-		appliquer_physique(delta)
 		return
 	if ZoneSure.contient(cible.global_position, 3.0):
 		etat = "retour"

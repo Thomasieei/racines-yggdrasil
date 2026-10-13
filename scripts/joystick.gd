@@ -13,6 +13,13 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
 func _input(event: InputEvent) -> void:
+	if Jeu.interface_bloquante:
+		if _doigt != -1:
+			_doigt = -1
+			_vecteur = Vector2.ZERO
+			vecteur_change.emit(_vecteur)
+			queue_redraw()
+		return
 	if event is InputEventScreenTouch:
 		var moitie := get_viewport_rect().size.x * 0.45
 		if event.pressed and _doigt == -1 and event.position.x < moitie:

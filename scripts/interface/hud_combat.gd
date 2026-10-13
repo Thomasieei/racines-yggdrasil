@@ -56,6 +56,14 @@ func brancher(h: Heros) -> void:
 	heros.energie_change.connect(_sur_energie)
 	heros.mort.connect(_sur_mort)
 	_sur_pv(heros.pv, heros.pv_max)
+	Jeu.hud = self
+	Jeu.joueur = h
+	sac_ui = CanvasLayer.new()
+	sac_ui.set_script(load("res://scripts/interface/sac_ui.gd"))
+	add_child(sac_ui)
+	sac_ui.brancher(h)
+	heros.ramasse.connect(_sur_ramasse)
+	_construire_boutons_monde()
 
 func _ready() -> void:
 	racine = Control.new()
@@ -106,6 +114,8 @@ func _haut_centre() -> void:
 	_sous_titre = texte("Seigneur draugr dans 14:52", 13, Color("#FFE2A0"), Vector2(x, 40), null, true, largeur, HORIZONTAL_ALIGNMENT_CENTER)
 
 func regler_titre(t: String, st: String, couleur_st := Color("#FFE2A0")) -> void:
+	if _titre.text == t and _sous_titre.text == st and _sous_titre.get_theme_color("font_color") == couleur_st:
+		return
 	_titre.text = t
 	_sous_titre.text = st
 	_sous_titre.add_theme_color_override("font_color", couleur_st)
@@ -196,6 +206,7 @@ func _dessiner_barres_ennemis() -> void:
 	if cam == null:
 		return
 	var police := ThemeDB.fallback_font
+	_dessiner_aventuriers(cam, police)
 	for e in get_tree().get_nodes_in_group("monstre"):
 		if e.est_mort or not e.has_method("en_combat") or not e.en_combat():
 			continue
@@ -206,8 +217,11 @@ func _dessiner_barres_ennemis() -> void:
 			_barres.draw_rect(rb.grow(3.0), Color(0, 0, 0, 0.8))
 			_barres.draw_rect(Rect2(rb.position, Vector2(lb * e.pv / e.pv_max, 12)), Color("#C2302A"))
 			_barres.draw_rect(Rect2(rb.position, Vector2(lb * e.pv / e.pv_max, 3)), Color(1, 0.75, 0.6, 0.6))
-			_barres.draw_string_outline(police, Vector2(640 - 200, 80), e.nom_affiche() + " — Élite", HORIZONTAL_ALIGNMENT_CENTER, 400, 15, 5, Color(0, 0, 0, 0.9))
-			_barres.draw_string(police, Vector2(640 - 200, 80), e.nom_affiche() + " — Élite", HORIZONTAL_ALIGNMENT_CENTER, 400, 15, Color("#FFB08A"))
+			var rang := " — Boss du donjon" if e.fiche.get("boss", false) else " — Élite"
+			_barres.draw_string_outline(police, Vector2(640 - 200, 80), e.nom_affiche() + rang, HORIZONTAL_ALIGNMENT_CENTER, 400, 15, 5, Color(0, 0, 0, 0.9))
+			_barres.draw_string(police, Vector2(640 - 200, 80), e.nom_affiche() + rang, HORIZONTAL_ALIGNMENT_CENTER, 400, 15, Color("#FFB08A"))
+		if e.fiche.get("boss", false) and e.est_eveille():
+			continue   # le roi a sa grande barre en haut de l'écran ; sa tête sort souvent du cadre
 		var monde: Vector3 = e.global_position + Vector3(0, e.hauteur_barre, 0)
 		if cam.is_position_behind(monde):
 			continue
@@ -225,6 +239,43 @@ func _dessiner_barres_ennemis() -> void:
 		if e.etourdi_t > 0.0:
 			_barres.draw_string_outline(police, p + Vector2(-60, h + 15), "étourdi", HORIZONTAL_ALIGNMENT_CENTER, 120, 11, 4, Color(0, 0, 0, 0.85))
 			_barres.draw_string(police, p + Vector2(-60, h + 15), "étourdi", HORIZONTAL_ALIGNMENT_CENTER, 120, 11, Color("#CFE3FF"))
+
+## Les autres aventuriers : pseudo, barre de vie, « AFK », en rouge s'ils nous sont hostiles.
+func _dessiner_aventuriers(cam: Camera3D, police: Font) -> void:
+	var moi = Jeu.joueur
+	if moi == null or not is_instance_valid(moi):
+		return
+	for b in get_tree().get_nodes_in_group("joueur"):
+		if b == moi or not b.is_physics_processing() or not b.get("ia"):
+			continue
+		var dist: float = b.global_position.distance_to(moi.global_position)
+		if dist > 30.0:
+			continue
+		var monde: Vector3 = b.global_position + Vector3(0, 2.55, 0)
+		if cam.is_position_behind(monde):
+			continue
+		var p := cam.unproject_position(monde)
+		var hostile: bool = moi.hostiles.has(b)
+		var alpha := clampf((30.0 - dist) / 6.0, 0.0, 1.0)
+		var nom: String = b.nom_joueur
+		var afk := false
+		for c in get_tree().get_nodes_in_group("bot_cerveau"):
+			if c.h == b:
+				afk = c.afk
+		if b.est_mort:
+			nom += " (mort)"
+		elif afk:
+			nom += "  AFK"
+		var coul := Color("#FF7A6A") if hostile else Color("#BFE0FF")
+		coul.a = alpha
+		_barres.draw_string_outline(police, p + Vector2(-90, -8), nom, HORIZONTAL_ALIGNMENT_CENTER, 180, 13, 4, Color(0, 0, 0, 0.85 * alpha))
+		_barres.draw_string(police, p + Vector2(-90, -8), nom, HORIZONTAL_ALIGNMENT_CENTER, 180, 13, coul)
+		if b.est_mort:
+			continue
+		var l := 56.0
+		var r := Rect2(p - Vector2(l / 2.0, 0), Vector2(l, 5))
+		_barres.draw_rect(r.grow(1.5), Color(0, 0, 0, 0.7 * alpha))
+		_barres.draw_rect(Rect2(r.position, Vector2(l * b.pv / b.pv_max, 5)), Color(0.85, 0.25, 0.2, alpha) if hostile else Color(0.35, 0.8, 0.45, alpha))
 
 # ---------- vignette ----------
 
@@ -285,7 +336,131 @@ func _sur_mort(_e) -> void:
 
 # ---------- boucle ----------
 
+# ---------- sac, action contextuelle, notifications ----------
+
+var sac_ui: CanvasLayer
+var _action_btn: Control
+var _action_lab: Label
+var _action_cible: Node = null
+var _notes: Array = []
+
+func _rond(centre: Vector2, d: float, icone: String) -> Control:
+	var c := Control.new()
+	c.position = centre - Vector2(d, d) / 2.0
+	c.size = Vector2(d, d)
+	c.mouse_filter = Control.MOUSE_FILTER_STOP
+	racine.add_child(c)
+	image(UI + "aventure/round_brown_dark.png", Vector2(d, d), Vector2.ZERO, c)
+	disque(Vector2(d, d) * 0.12, d * 0.76, Color(0.09, 0.07, 0.06, 0.95), c)
+	image(icone, Vector2(d, d) * 0.6, Vector2(d, d) * 0.2, c)
+	return c
+
+func _construire_boutons_monde() -> void:
+	var sac_btn := _rond(Vector2(1046, 46), 60, "res://assets/icones_sorts/sac.svg")
+	sac_btn.gui_input.connect(func(ev):
+		if (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and ev.pressed):
+			sac_ui.basculer())
+	_action_btn = _rond(Vector2(1076, 300), 74, "res://assets/icones_sorts/main.svg")
+	_action_lab = texte("", 14, Color("#FFF4DC"), Vector2(-30, 74), _action_btn, true, 134, HORIZONTAL_ALIGNMENT_CENTER)
+	_action_btn.gui_input.connect(func(ev):
+		if (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and ev.pressed):
+			_agir())
+	_action_btn.visible = false
+
+func _agir() -> void:
+	if _action_cible and is_instance_valid(_action_cible) and heros.action == "":
+		_action_cible.interagir(heros)
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_B or event.keycode == KEY_I:
+			sac_ui.basculer()
+		elif event.keycode == KEY_E:
+			_agir()
+
+## Objet du monde le plus proche avec lequel on peut agir (coffre, filon, dépouille).
+func _chercher_action() -> void:
+	var meilleur: Node = null
+	var d := 99.0
+	for o in get_tree().get_nodes_in_group("interactif"):
+		if not o.disponible():
+			continue
+		var l: float = Vector2(o.global_position.x - heros.global_position.x, o.global_position.z - heros.global_position.z).length()
+		var portee: float = o.get("rayon_action") if o.get("rayon_action") != null else o.rayon
+		if l < portee and l < d:
+			d = l
+			meilleur = o
+	_action_cible = meilleur
+	_action_btn.visible = meilleur != null and not heros.est_mort and not Jeu.interface_bloquante
+	if meilleur:
+		var c := heros.canal_en_cours()
+		_action_lab.text = meilleur.texte_action() if c == "" else "…"
+
+func notifier(t: String, couleur := Color.WHITE, icone := "") -> void:
+	var n := Control.new()
+	n.position = Vector2(1280 - 330, 170)
+	n.size = Vector2(316, 30)
+	n.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	racine.add_child(n)
+	var fond := Panel.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.04, 0.05, 0.08, 0.7)
+	sb.border_color = Color(couleur.r, couleur.g, couleur.b, 0.8)
+	sb.border_width_right = 3
+	sb.set_corner_radius_all(5)
+	fond.add_theme_stylebox_override("panel", sb)
+	fond.size = Vector2(316, 30)
+	fond.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	n.add_child(fond)
+	var x := 8.0
+	if icone != "":
+		image(icone, Vector2(26, 26), Vector2(4, 2), n)
+		x = 34.0
+	var lt := texte(t, 14, couleur, Vector2(x, 5), n, true, 316 - x - 8, HORIZONTAL_ALIGNMENT_RIGHT)
+	# message long : sur deux lignes plutôt que coupé au bord de l'écran
+	if ThemeDB.fallback_font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x > 316 - x - 12:
+		lt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		lt.size = Vector2(316 - x - 8, 40)
+		fond.size.y = 48
+		n.size.y = 48
+	_notes.push_front({"n": n, "t": 0.0})
+	if _notes.size() > 6:
+		var vieux = _notes.pop_back()
+		vieux["n"].queue_free()
+
+func _maj_notes(delta: float) -> void:
+	var y := 170.0
+	for e in _notes.duplicate():
+		e["t"] += delta
+		var n: Control = e["n"]
+		n.position.y = lerpf(n.position.y, y, 1.0 - exp(-12.0 * delta))
+		n.modulate.a = clampf(1.0 - (e["t"] - 3.2) / 0.6, 0.0, 1.0)
+		if e["t"] > 3.8:
+			n.queue_free()
+			_notes.erase(e)
+		y += n.size.y + 4.0
+
+func _sur_ramasse(or_: int, objets: Array, origine: String) -> void:
+	if or_ > 0:
+		notifier("+%d or" % or_, Color("#FFD36B"), "res://assets/icones_objets/pieces_or.png")
+	for o in objets:
+		var c := Objets.couleur(o)
+		var t: String = o["nom"] + (" ×%d" % o["qte"] if o["qte"] > 1 else "")
+		if o["type"] == "oeuf":
+			t = "✦ " + o["nom"] + " ✦"
+			Sons.jouer("cloche", heros.global_position, 0.0, 1.3)
+		notifier(t, c, o["icone"])
+
+func ouvrir_butin(titre: String, contenu: Dictionary, h: Node, couleur := Color.WHITE) -> void:
+	var b := CanvasLayer.new()
+	b.set_script(load("res://scripts/interface/butin_ui.gd"))
+	add_child(b)
+	b.montrer(titre, contenu, h, couleur)
+
 func _process(delta: float) -> void:
+	if heros:
+		_chercher_action()
+		_maj_notes(delta)
 	if heros == null:
 		return
 	# traînée de vie
@@ -296,9 +471,10 @@ func _process(delta: float) -> void:
 	var f := clampf((0.35 - k) / 0.35, 0.0, 1.0)
 	(_vignette.material as ShaderMaterial).set_shader_parameter("force", f * (0.75 + 0.25 * sin(Time.get_ticks_msec() * 0.008)))
 	# incantation
-	if heros.action == "incantation":
+	if heros.action == "incantation" or heros.action == "canal":
 		_incant.visible = true
-		_incant_nom.text = Heros.COMPETENCES["e"]["nom"]
+		_incant_nom.text = Heros.COMPETENCES["e"]["nom"] if heros.action == "incantation" else heros.canal_en_cours()
+		_incant_plein.color = GIVRE if heros.action == "incantation" else Color("#F4C35A")
 		_incant_plein.size.x = 236.0 * clampf(heros._action_t / heros._action["duree"], 0.0, 1.0)
 	else:
 		_incant.visible = false

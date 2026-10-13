@@ -7,6 +7,11 @@ signal refus(id: String, raison: String)
 
 const MODELE := "res://assets/personnages/barbare.glb"
 const CACHES := ["1H_Axe_Offhand", "Barbarian_Round_Shield", "Mug", "1H_Axe"]
+const CHEVALIER := "res://assets/personnages/chevalier.glb"
+const CACHES_CHEVALIER := ["1H_Sword_Offhand", "Badge_Shield", "Rectangle_Shield", "Round_Shield", "Spike_Shield", "1H_Sword"]
+
+## Dans le donjon, le joueur peut frapper les autres aventuriers hors des zones sûres (JcJ ouvert).
+static var jcj_actif := false
 
 ## Fiche des compétences (lue aussi par le HUD et les fiches d'objet).
 const COMPETENCES := {
@@ -25,7 +30,78 @@ const COMPETENCES := {
 
 var entree := Vector2.ZERO              ## joystick, x = est, y = sud
 var energie := 100.0
-var potions := 3
+var sac := Sac.new()
+var potions: int:
+	get: return sac.compter("potion")
+var ia := false                         ## joueur piloté par l'IA (bots) : ignore le clavier
+var nom_joueur := "Thomas"
+var hostiles: Array = []                ## héros que l'on combat (JcJ) : attaqués ou agresseurs
+var dernier_agresseur: Node = null
+var tueur: Node = null
+var classe_modele := MODELE
+var _canal := {}
+var metier_mine := {"niveau": 1, "xp": 0}
+var niveau := 12
+var xp := 0
+var acolyte_noeud: Node3D
+
+## Équipe un dragon du sac (l'ancien retourne dans le sac).
+func equiper_dragon(d: Dictionary) -> void:
+	if not sac.acolyte.is_empty():
+		sac.objets.append(sac.acolyte)
+	sac.objets.erase(d)
+	sac.acolyte = d
+	sac.change.emit()
+	if acolyte_noeud and is_instance_valid(acolyte_noeud):
+		acolyte_noeud.queue_free()
+	acolyte_noeud = Acolyte.invoquer(self, d)
+
+func desequiper_dragon() -> void:
+	if sac.acolyte.is_empty():
+		return
+	if sac.ajouter(sac.acolyte):
+		sac.acolyte = {}
+		sac.change.emit()
+		if acolyte_noeud and is_instance_valid(acolyte_noeud):
+			acolyte_noeud.queue_free()
+
+func equiper_arme(a: Dictionary) -> void:
+	sac.objets.erase(a)
+	if not sac.arme.is_empty():
+		sac.objets.append(sac.arme)
+	sac.arme = a
+	sac.change.emit()
+
+func xp_acolyte(n: int) -> void:
+	var d: Dictionary = sac.acolyte
+	if d.is_empty():
+		return
+	d["xp"] = d.get("xp", 0) + n
+	var monte := false
+	while d["xp"] >= Objets.xp_niveau(d["niveau"]):
+		d["xp"] -= Objets.xp_niveau(d["niveau"])
+		d["niveau"] += 1
+		monte = true
+	if monte:
+		if acolyte_noeud and is_instance_valid(acolyte_noeud):
+			acolyte_noeud.grandir()
+		if self == Jeu.joueur:
+			Jeu.notifier("%s passe niveau %d !" % [d["nom"], d["niveau"]], Objets.COULEURS[d["rarete"]])
+
+func gagner_xp_mine(n: int) -> void:
+	metier_mine["xp"] += n
+	var besoin: int = 40 + metier_mine["niveau"] * 30
+	if self == Jeu.joueur:
+		Jeu.notifier("+%d XP Mineur" % n, Color("#C9B7FF"))
+	while metier_mine["xp"] >= besoin:
+		metier_mine["xp"] -= besoin
+		metier_mine["niveau"] += 1
+		besoin = 40 + metier_mine["niveau"] * 30
+		if self == Jeu.joueur:
+			Jeu.notifier("Mineur niveau %d !" % metier_mine["niveau"], Color("#FFD34E"))
+			Effets.onde(_scene(), global_position, 3.0, Color(0.8, 0.7, 1.0))
+			Sons.jouer("pret", global_position, 0.0, 1.0)
+signal canal_fini(nom: String, reussi: bool)
 var cds := {}
 var action := ""                        ## "", "saut", "incantation", "ruee", "esquive"
 var _action_t := 0.0
@@ -44,7 +120,9 @@ func _ready() -> void:
 	super._ready()
 	collision_layer = 4     # les monstres ne se bloquent pas sur le héros : séparation douce gérée par eux
 	collision_mask = 1
-	installer_modele(load(MODELE), 1.0, CACHES)
+	installer_modele(load(classe_modele), 1.0, CACHES_CHEVALIER if classe_modele == CHEVALIER else CACHES)
+	sac.ajouter(Objets.creer("potion", "commun", 3))
+	sac.change.connect(_maj_arme)
 	for id in COMPETENCES:
 		cds[id] = 0.0
 	var f := CollisionShape3D.new()
@@ -62,7 +140,75 @@ func _ready() -> void:
 # ---------------- utilitaires ----------------
 
 func ennemis_vivants() -> Array:
-	return get_tree().get_nodes_in_group("monstre").filter(func(e): return not e.est_mort)
+	var l := get_tree().get_nodes_in_group("monstre").filter(func(e): return not e.est_mort)
+	for h in hostiles:
+		if is_instance_valid(h) and not h.est_mort:
+			l.append(h)
+	return l
+
+## Rend deux héros ennemis (JcJ). Jamais en zone sûre.
+func declarer_hostile(autre: Node, riposte := false) -> void:
+	if autre == self or not autre is Heros or autre.est_mort:
+		return
+	if not hostiles.has(autre) and autre == Jeu.joueur and ia:
+		if riposte:
+			Jeu.notifier("%s riposte ! Celui qui tombe perd tout son sac." % nom_joueur, Color("#FFB37A"))
+		else:
+			Jeu.notifier("%s t'attaque ! Celui qui tombe perd tout son sac." % nom_joueur, Color("#FF6A5A"))
+	if not hostiles.has(autre):
+		hostiles.append(autre)
+	if not autre.hostiles.has(self):
+		autre.hostiles.append(self)
+
+## Ce que les sorts touchent : les monstres et les aventuriers déclarés hostiles. Jamais un
+## aventurier neutre par accident : pour l'attaquer il faut le défier (bouton « Attaquer »).
+func cibles_touchables() -> Array:
+	return ennemis_vivants()
+
+# ---------------- défi JcJ (le joueur s'approche d'un aventurier IA) ----------------
+
+var rayon_action := 3.5
+const MULT_JCJ := 3.0                   ## entre aventuriers les coups portent plus : un duel dure ~20 s, pas une minute
+
+func texte_action() -> String:
+	return "Attaquer"
+
+func disponible() -> bool:
+	var j = Jeu.joueur
+	return ia and jcj_actif and not est_mort and j != null and is_instance_valid(j) and not hostiles.has(j) \
+		and not ZoneSure.contient(global_position) and not ZoneSure.contient(j.global_position)
+
+func interagir(h: Heros) -> void:
+	h.declarer_hostile(self)
+	Jeu.notifier("Tu attaques %s. Celui qui tombe perd tout son sac." % nom_joueur, Color("#FFB37A"))
+
+func _micro_pause(t: float) -> void:
+	if not ia:
+		Effets.micro_pause(get_tree(), t)
+
+func _maj_arme() -> void:
+	degats_arme = sac.arme.get("degats", 90) / 30.0 if not sac.arme.is_empty() else 3.0
+
+## Action canalisée (miner, ouvrir un coffre, fouiller un corps) : barre de progression,
+## annulée si l'on bouge, si l'on est frappé ou si l'on lance un sort.
+func canaliser(nom: String, duree: float, anim_nom := "Interact") -> void:
+	if action != "" or est_mort:
+		return
+	action = "canal"
+	_action_t = 0.0
+	_canal = {"nom": nom, "duree": duree}
+	_action = {"duree": duree}
+	jouer(anim_nom, 0.1, 1.0, duree)
+
+func canal_en_cours() -> String:
+	return _canal.get("nom", "") if action == "canal" else ""
+
+func _fin_canal(reussi: bool) -> void:
+	var nom: String = _canal.get("nom", "")
+	action = ""
+	_canal = {}
+	verrou_anim = 0.0
+	canal_fini.emit(nom, reussi)
 
 func ennemi_proche(portee: float) -> EntiteCombat:
 	var meilleur: EntiteCombat = null
@@ -90,6 +236,8 @@ func en_mouvement_rapide() -> bool:
 	return action in ["saut", "ruee", "esquive"]
 
 func _camera_secousse(f: float) -> void:
+	if ia:
+		return
 	var cam := get_viewport().get_camera_3d()
 	if cam and cam.has_method("secouer"):
 		cam.secouer(f)
@@ -117,6 +265,8 @@ func lancer(id: String, dir = null) -> bool:
 		raison = "Plus de potions"
 	elif id in ["q", "w", "e"] and ZoneSure.contient(global_position):
 		raison = "Pas d'arme tirée ici"
+	if raison != "" and ia:
+		return false
 	if raison != "":
 		refus.emit(id, raison)
 		Effets.nombre(_scene(), global_position, raison, Color("#CFD6EE"), false, "etat")
@@ -168,14 +318,14 @@ func _fendoir(d: Vector3) -> void:
 		return
 	Effets.taille(_scene(), global_position, d, 3.4, Color(1.0, 0.8, 0.45), "slash_02.png", 0.24, -0.9)
 	var touche := false
-	for e in ennemis_vivants():
+	for e in cibles_touchables():
 		if Zones.dans_cone(e.global_position, global_position, d, 3.6, 0.95, e.rayon):
 			e.recevoir({"montant": 34.0 * degats_arme, "source": self, "critique": randf() < 0.15, "recul": 0.6})
 			touche = true
 	if touche:
 		Sons.jouer("coup_os", global_position, 0.0)
 		_camera_secousse(0.25)
-		Effets.micro_pause(get_tree(), 0.05)
+		_micro_pause(0.05)
 
 func _bond(d: Vector3) -> void:
 	var dist := Zones.distance_libre(get_world_3d(), global_position, d, 7.0, [get_rid()])
@@ -193,13 +343,13 @@ func _fin_bond() -> void:
 	Sons.jouer("atterrissage", global_position, 0.0)
 	_camera_secousse(0.4)
 	var touche := false
-	for e in ennemis_vivants():
+	for e in cibles_touchables():
 		if Zones.dans_cercle(e.global_position, global_position, 2.6, e.rayon):
 			e.recevoir({"montant": 26.0 * degats_arme, "source": self, "ralentir": 1.5, "recul": 1.2})
 			touche = true
 	if touche:
 		Sons.jouer("coup_lourd", global_position)
-		Effets.micro_pause(get_tree(), 0.06)
+		_micro_pause(0.06)
 
 func _ruee_incantation(d: Vector3) -> void:
 	regarder(d)
@@ -289,7 +439,10 @@ func _pas_du_vent() -> void:
 	_vent_particules.emitting = true
 
 func _potion() -> void:
-	potions -= 1
+	for o in sac.objets:
+		if o["id"] == "potion":
+			sac.retirer(o, 1)
+			break
 	_soin_t = 4.0
 	jouer("Use_Item", 0.08, 1.4, 0.5)
 	Sons.jouer("potion", global_position)
@@ -316,12 +469,27 @@ func _esquive(d: Vector3) -> void:
 	Sons.jouer("tissu", global_position, -2.0, 1.2)
 
 func interrompre() -> void:
+	if action == "canal":
+		_fin_canal(false)
+		return
 	if action == "incantation":
 		var t = _action.get("tele")
 		if is_instance_valid(t):
 			t.terminer(true)
 		action = ""
 		Effets.nombre(_scene(), global_position, "Interrompu", Color("#FFB37A"), false, "etat")
+
+func recevoir(d: Dictionary) -> void:
+	var src = d.get("source", null)
+	if src != null and is_instance_valid(src):
+		dernier_agresseur = src
+		if src is Heros:
+			declarer_hostile(src, true)
+			d = d.duplicate()
+			d["montant"] = d.get("montant", 0.0) * MULT_JCJ
+	if action == "canal" and d.get("montant", 0.0) > 0.0 and invulnerable_t <= 0.0 and not est_mort:
+		_fin_canal(false)
+	super.recevoir(d)
 
 func _reaction_coup(d: Dictionary) -> void:
 	Sons.jouer("coup_recu", global_position, -2.0)
@@ -330,9 +498,34 @@ func _reaction_coup(d: Dictionary) -> void:
 		jouer("Hit_A", 0.05, 1.6, 0.22)
 
 func _mourir() -> void:
+	tueur = dernier_agresseur if is_instance_valid(dernier_agresseur) else null
 	super._mourir()
 	cacher_visee()
 	jouer("Death_A", 0.1, 1.0, 99.0)
+	# tout ce qu'on porte reste au sol ; si un autre joueur nous a tués, il se sert d'abord
+	var butin := sac.tout_vider()
+	if acolyte_noeud and is_instance_valid(acolyte_noeud):
+		acolyte_noeud.queue_free()
+	if tueur is Heros and not tueur.est_mort:
+		butin = tueur.ramasser(butin, "la dépouille de " + nom_joueur)
+	if not butin["objets"].is_empty() or butin["or"] > 0:
+		Depouille.creer(_scene(), global_position, butin, nom_joueur)
+
+## Prend tout ce qui rentre dans le sac ; renvoie ce qui reste.
+func ramasser(butin: Dictionary, origine := "") -> Dictionary:
+	var reste: Array = []
+	if butin["or"] > 0:
+		sac.ajouter_or(butin["or"])
+	var pris: Array = []
+	for o in butin["objets"]:
+		if sac.ajouter(o):
+			pris.append(o)
+		else:
+			reste.append(o)
+	ramasse.emit(butin["or"], pris, origine)
+	return {"or": 0, "objets": reste}
+
+signal ramasse(or_: int, objets: Array, origine: String)
 
 # ---------------- boucle ----------------
 
@@ -369,6 +562,16 @@ func _physics_process(delta: float) -> void:
 					modele.position.y = 0.0
 				_fin_bond()
 			return
+		"canal":
+			_action_t += delta
+			velocity = Vector3.ZERO
+			appliquer_physique(delta)
+			var e2 := entree + (Vector2.ZERO if ia else Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down"))
+			if e2.length() > 0.5:
+				_fin_canal(false)
+			elif _action_t >= _canal["duree"]:
+				_fin_canal(true)
+			return
 		"incantation":
 			_action_t += delta
 			velocity = Vector3.ZERO
@@ -383,7 +586,7 @@ func _physics_process(delta: float) -> void:
 			velocity.y = 0
 			move_and_slide()
 			var dep: Vector3 = _action["dep"]
-			for e in ennemis_vivants():
+			for e in cibles_touchables():
 				if e in _action["touches"]:
 					continue
 				if Zones.dans_ligne(e.global_position, dep, _action["dir"], _action["dist"] * k2 + 0.5, 2.6, e.rayon):
@@ -397,7 +600,7 @@ func _physics_process(delta: float) -> void:
 				Effets.poussiere(_scene(), global_position, 10)
 				if not _action["touches"].is_empty():
 					_camera_secousse(0.5)
-					Effets.micro_pause(get_tree(), 0.07)
+					_micro_pause(0.07)
 			return
 		"esquive":
 			_action_t += delta
@@ -418,7 +621,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	# déplacement
-	var clavier := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+	var clavier := Vector2.ZERO if ia else Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
 	var e_in := entree + clavier
 	if e_in.length() > 1.0:
 		e_in = e_in.normalized()
@@ -439,6 +642,8 @@ func _physics_process(delta: float) -> void:
 	# attaque automatique sur l'ennemi proche
 	_attaque_t -= delta
 	var cible_auto := ennemi_proche(3.0)
+	if cible_auto is Heros and (ZoneSure.contient(global_position) or ZoneSure.contient(cible_auto.global_position)):
+		cible_auto = null
 	if cible_auto and _attaque_t <= 0.0 and verrou_anim <= 0.0:
 		_attaque_t = 0.95
 		var dir_a := direction_vers(cible_auto.global_position)

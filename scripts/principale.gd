@@ -24,7 +24,40 @@ static var carte_suivante := ""
 static var sans_intro_suivante := false
 var monde: Node3D
 
+var chargement: CanvasLayer
+
 func _ready() -> void:
+	# écran de chargement d'abord : la construction du monde et la compilation des effets
+	# se font derrière lui, le joueur ne voit jamais d'image figée ni d'à-coup
+	chargement = CanvasLayer.new()
+	chargement.set_script(load("res://scripts/chargement.gd"))
+	add_child(chargement)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_construire()
+	if not "--sans-qualite-auto" in OS.get_cmdline_user_args() and not _enregistrement():
+		var q := Node.new()
+		q.set_script(load("res://scripts/qualite.gd"))
+		q.name = "Qualite"
+		add_child(q)
+	await chargement.prechauffer(self)
+	# grille de déplacement des aventuriers IA : calculée sous l'écran de chargement, pas en jouant
+	var sd := get_node_or_null("ScenarioDonjon")
+	if sd and sd.has_method("preparer"):
+		await sd.preparer()
+	chargement.disparaitre()
+	if "--test-objets" in OS.get_cmdline_user_args():
+		_test_objets()
+
+## Pendant un enregistrement vidéo ou une capture, on ne touche pas à la qualité (rendu lent mais voulu).
+func _enregistrement() -> bool:
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--capture") or a.begins_with("--tour") or a.begins_with("--plan") or a.begins_with("--demo") or a == "--survol":
+			return true
+	return OS.has_feature("movie")
+
+func _construire() -> void:
+	Heros.jcj_actif = false
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--carte="):
 			carte = a.substr(8)
@@ -161,6 +194,8 @@ func _fondu_entree() -> void:
 	create_tween().tween_property(v, "color:a", 0.0, 0.9)
 
 func _physics_process(_d: float) -> void:
+	if joueur == null:
+		return
 	# entrer dans le Portail = descendre dans le donjon du jour
 	if carte == "surface" and joueur and not joueur.est_mort and carte_suivante != "crypte_en_cours":
 		if joueur.global_position.distance_to(CarteSurface.PORTAIL + Vector3(0, 0, 1.6)) < 2.6:
@@ -177,6 +212,8 @@ func _meutes() -> void:
 		d.regarder(d.direction_vers(joueur.position))
 
 func _unhandled_input(event: InputEvent) -> void:
+	if joueur == null:
+		return
 	if event is InputEventKey and event.pressed and not event.echo and TOUCHES.has(event.keycode):
 		joueur.lancer(TOUCHES[event.keycode])
 
@@ -197,12 +234,13 @@ func _environnement() -> void:
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
-	# clair de lune froid, très faible, pour détacher les volumes
+	# sous terre : une lueur froide très faible pour détacher les volumes, sans ombres
+	# (une ombre directionnelle redessine toute la caverne une seconde fois à chaque image)
 	var lune := DirectionalLight3D.new()
 	lune.light_color = Color(0.55, 0.65, 1.0)
-	lune.light_energy = 0.22
+	lune.light_energy = 0.18
 	lune.rotation_degrees = Vector3(-60, -30, 0)
-	lune.shadow_enabled = true
+	lune.shadow_enabled = false
 	add_child(lune)
 
 ## Fin d'après-midi dans le Val : soleil doré rasant, ombres longues, ciel froid dans les ombres.
@@ -231,8 +269,10 @@ func _environnement_surface() -> void:
 	soleil.light_color = Color(1.0, 0.84, 0.62)
 	soleil.light_energy = 0.85
 	soleil.rotation_degrees = Vector3(-38, -58, 0)
-	soleil.shadow_enabled = true
-	soleil.directional_shadow_max_distance = 70.0
+	soleil.shadow_enabled = not "--sans-ombres" in OS.get_cmdline_user_args()
+	soleil.add_to_group("soleil")
+	soleil.directional_shadow_max_distance = 42.0
+	soleil.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	soleil.shadow_blur = 1.5
 	add_child(soleil)
 
@@ -283,6 +323,12 @@ func _capture_si_demandee() -> void:
 					for k in 7:
 						await get_tree().process_frame
 				get_viewport().get_texture().get_image().save_png("/tmp/claude-0/scr/tour_%d.png" % i)
+				if "--mesure" in OS.get_cmdline_user_args():
+					printerr("MESURE ", lieux[i], " appels=", RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
+						" objets=", RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME),
+						" triangles=", RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME),
+						" noeuds=", get_tree().get_node_count(), " ms_process=", snappedf(Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, 0.1),
+						" ms_physique=", snappedf(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0, 0.1))
 			get_tree().quit()
 			return
 		elif a.begins_with("--marche="):
@@ -296,3 +342,73 @@ func _capture_si_demandee() -> void:
 	img.save_png(chemin)
 	print("capture : ", chemin)
 	get_tree().quit()
+
+func _test_objets() -> void:
+	var h := joueur
+	h.invulnerable_t = 9999.0
+	await get_tree().create_timer(1.0).timeout
+	# coffre de la crypte
+	var c: Coffre = null
+	for o in get_tree().get_nodes_in_group("interactif"):
+		if o is Coffre and o.global_position.distance_to(Vector3(14, 0, 5.2)) < 1.0:
+			c = o
+	h.global_position = Vector3(14, 0.1, 7.5)
+	c.interagir(h)
+	await get_tree().create_timer(0.8).timeout
+	await _cap("canal")
+	await get_tree().create_timer(1.2).timeout
+	await _cap("butin")
+	printerr("TEST coffre ouvert=", c.ouvert, " fenetre=", get_tree().get_nodes_in_group("x").size(), " or=", h.sac.or_, " objets=", h.sac.objets.size())
+	# prendre tout via la fenêtre
+	for n in hud.get_children():
+		if n.has_method("montrer"):
+			n._prendre(n.contenu["objets"].duplicate(), "t", Color.WHITE, true)
+	printerr("TEST apres prise or=", h.sac.or_, " objets=", h.sac.objets.map(func(o): return o["nom"] + "x" + str(o["qte"])))
+	# filon
+	var f: Filon = null
+	for o in get_tree().get_nodes_in_group("interactif"):
+		if o is Filon and o.type == "cuivre":
+			f = o
+			break
+	h.global_position = f.global_position + Vector3(1.8, 0.1, 0)
+	f.interagir(h)
+	await get_tree().create_timer(2.8).timeout
+	printerr("TEST minage cuivre=", h.sac.compter("minerai_cuivre"), " mineur=", h.metier_mine)
+	# œuf et éclosion
+	var stats := {}
+	for i in 2000:
+		var d := Objets.eclore(Objets.creer("oeuf", "rare"))
+		stats[d["rarete"]] = stats.get(d["rarete"], 0) + 1
+	printerr("TEST 2000 oeufs rares -> ", stats)
+	var oeuf := Objets.creer("oeuf", "epique")
+	h.sac.ajouter(oeuf)
+	h.sac.ajouter(Objets.creer("oeuf", "legendaire"))
+	h.sac.ajouter(Objets.creer("espadon", "epique"))
+	hud.sac_ui.ouvrir_sac()
+	hud.sac_ui._choix = h.sac.objets[h.sac.objets.size() - 1]
+	hud.sac_ui._rafraichir()
+	await _cap("sac")
+	hud.sac_ui._eclore(oeuf)
+	await get_tree().create_timer(1.5).timeout
+	await _cap("eclosion1")
+	await get_tree().create_timer(2.5).timeout
+	await _cap("eclosion2")
+	var dr: Dictionary = {}
+	for o in h.sac.objets:
+		if o["type"] == "dragon":
+			dr = o
+	h.equiper_dragon(dr)
+	printerr("TEST dragon=", dr["nom"], " puissance=", dr["puissance"], " acolyte=", is_instance_valid(h.acolyte_noeud))
+	for n in hud.sac_ui.get_children():
+		if n.has_method("lancer"):
+			n.queue_free()
+	hud.sac_ui.fermer_sac()
+	await get_tree().create_timer(1.5).timeout
+	await _cap("acolyte")
+	get_tree().quit()
+
+func _cap(nom: String) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png("/tmp/claude-0/scr/ui_%s.png" % nom)

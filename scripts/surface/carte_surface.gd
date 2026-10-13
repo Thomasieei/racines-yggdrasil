@@ -184,6 +184,18 @@ func _multimesh(chemin: String, transforms: Array, ombres := true) -> void:
 	var m := _maillage(chemin)
 	if m.is_empty():
 		return
+	# découpage en cases de 64 m : la caméra ne dessine que les cases qu'elle voit
+	var cases := {}
+	for xf in transforms:
+		var cle := Vector2i(floori(xf.origin.x / 64.0), floori(xf.origin.z / 64.0))
+		if not cases.has(cle):
+			cases[cle] = []
+		cases[cle].append(xf)
+	for cle in cases:
+		_multimesh_lot(m, cases[cle], ombres)
+	return
+
+func _multimesh_lot(m: Array, transforms: Array, ombres: bool) -> void:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.mesh = m[0]
@@ -594,7 +606,7 @@ func _herbes() -> void:
 	var cles_t := touffes.keys()
 	var cles_b := buissons.keys()
 	var cles_r := rochers.keys()
-	for i in 2600:
+	for i in 1500:
 		var p := Vector2(_rng.randf_range(LIMITES.position.x, LIMITES.end.x), _rng.randf_range(LIMITES.position.y, LIMITES.end.y))
 		var dc: float = distance_chemin(p)[0]
 		if dc < 3.3:
@@ -616,6 +628,6 @@ func _herbes() -> void:
 	for k in touffes:
 		_multimesh(F + k + "_Color1.gltf", touffes[k], false)
 	for k in buissons:
-		_multimesh(F + k + "_Color1.gltf", buissons[k])
+		_multimesh(F + k + "_Color1.gltf", buissons[k], false)
 	for k in rochers:
-		_multimesh(F + k + "_Color1.gltf", rochers[k])
+		_multimesh(F + k + "_Color1.gltf", rochers[k], false)
