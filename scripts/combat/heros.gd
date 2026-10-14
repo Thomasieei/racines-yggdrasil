@@ -294,12 +294,12 @@ func puissance() -> int:
 
 ## Action canalisée (miner, ouvrir un coffre, fouiller un corps) : barre de progression,
 ## annulée si l'on bouge, si l'on est frappé ou si l'on lance un sort.
-func canaliser(nom: String, duree: float, anim_nom := "Interact") -> void:
+func canaliser(nom: String, duree: float, anim_nom := "Interact", inebranlable := false) -> void:
 	if action != "" or est_mort:
 		return
 	action = "canal"
 	_action_t = 0.0
-	_canal = {"nom": nom, "duree": duree}
+	_canal = {"nom": nom, "duree": duree, "inebranlable": inebranlable}
 	_action = {"duree": duree}
 	jouer(anim_nom, 0.1, 1.0, duree)
 
@@ -695,7 +695,7 @@ func recevoir(d: Dictionary) -> void:
 			declarer_hostile(src, true)
 			d = d.duplicate()
 			d["montant"] = d.get("montant", 0.0) * MULT_JCJ
-	if action == "canal" and d.get("montant", 0.0) > 0.0 and invulnerable_t <= 0.0 and not est_mort:
+	if action == "canal" and d.get("montant", 0.0) > 0.0 and invulnerable_t <= 0.0 and not est_mort and not _canal.get("inebranlable", false):
 		_fin_canal(false)
 	if d.get("montant", 0.0) > 0.0 and invulnerable_t <= 0.0 and not est_mort:
 		_t_sans_coup = 0.0

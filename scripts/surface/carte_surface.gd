@@ -13,7 +13,7 @@ const HW := "res://assets/halloween/"
 const DJ := "res://assets/donjon/"
 const R := "res://assets/surface/ressources/"
 
-const LIMITES := Rect2(0, -20, 172, 150)           ## zone jouable (x, z)
+const LIMITES := PlanMonde.LIMITES                 ## zone jouable (x, z)
 const CHEMIN := [
 	Vector2(36, 104), Vector2(40, 96), Vector2(47, 88), Vector2(55, 80), Vector2(62, 70), Vector2(70, 62),
 	Vector2(80, 57), Vector2(92, 53), Vector2(104, 48), Vector2(116, 42), Vector2(127, 37), Vector2(127, 16), Vector2(127, 3),
@@ -24,30 +24,13 @@ const BOURG := Rect2(104, 16, 46, 42)
 const PLACE := Vector3(127, 0, 37)
 const PORTAIL := Vector3(127, 0, -5)
 const PORTE_BOURG := Vector3(104, 0, 48)
-## Hameau de Brekka : village de travailleurs au nord-ouest, relié au chemin par un sentier.
-const VILLAGE := Rect2(28, -10, 50, 42)
-const PLACE_VILLAGE := Vector3(53, 0, 12)
-const ROUTE_VILLAGE := [Vector2(66, 64), Vector2(60, 46), Vector2(55, 30)]
-## Maisons : [modèle, position, rotation, nom de famille]. Les portes regardent la place.
-const MAISONS := [
-	["building_home_A_blue", Vector3(40, 0, 2), 35.0, "Brekka"], ["building_home_B_blue", Vector3(66, 0, 2), -35.0, "Hallsdóttir"],
-	["building_home_A_blue", Vector3(36, 0, 20), 75.0, "Ulfsson"], ["building_home_B_blue", Vector3(70, 0, 20), -75.0, "Dagny"],
-	["building_tavern_blue", Vector3(53, 0, -4), 0.0, "Taverne du Hareng"],
-]
+const PLACE_VILLAGE := PlanMonde.PLACE_BREKKA
 ## Terres Gâtées : au sud-est du Bourg, une lande morte où la Horde se lève sans fin.
 const TERRES := Rect2(134, 76, 34, 48)
 const ROUTE_TERRES := [Vector2(127.5, 57), Vector2(129, 66), Vector2(139, 78)]
 
 ## Lieux nommés (bandeaux d'entrée de zone, minicarte, guidage)
-const LIEUX := [
-	{"id": "sanctuaire", "nom": "Sanctuaire de Freya", "centre": Vector3(36, 0, 106), "rayon": 13.0},
-	{"id": "clairiere", "nom": "Clairière des Tertres", "centre": Vector3(62, 0, 69), "rayon": 13.0},
-	{"id": "bourg", "nom": "Bourg de Skjold", "centre": Vector3(127, 0, 37), "rayon": 27.0, "sur": true},
-	{"id": "portail", "nom": "Portail d'Yggdrasil", "centre": Vector3(127, 0, 0), "rayon": 13.0},
-	{"id": "village", "nom": "Hameau de Brekka", "centre": Vector3(53, 0, 10), "rayon": 24.0},
-	{"id": "terres", "nom": "Terres Gâtées", "centre": Vector3(151, 0, 100), "rayon": 24.0},
-	{"id": "bois", "nom": "Bois des Murmures", "centre": Vector3(80, 0, 70), "rayon": 999.0},
-]
+const LIEUX := PlanMonde.LIEUX
 
 const TEINTE_FORET := Color(0.7, 0.76, 0.68)     ## le pack Forest est très vif : on l'assourdit pour l'heure dorée
 
@@ -68,7 +51,10 @@ var _cache := {}
 var _decor: Node3D
 var _colliders: Node3D
 
+var _t_depart := 0
+
 func _ready() -> void:
+	_t_depart = Time.get_ticks_msec()
 	courante = self
 	_rng.seed = 7741
 	_decor = Node3D.new()
@@ -79,6 +65,20 @@ func _ready() -> void:
 	add_child(_colliders)
 	ZoneSure.vider()
 	ZoneSure.ajouter("Bourg de Skjold", PLACE, 27.0)
+	# 1. le plan : routes, villes, lac peints dans le masque du sol (la forêt les évitera)
+	PlanMonde.preparer()
+	PlanMonde.ligne(CHEMIN, 2.6, 0, 1.0, 6.0)
+	PlanMonde.ligne(ROUTE_TERRES, 2.2, 0, 1.0, 4.0)
+	PlanMonde.rect(BOURG, 0, 0.55, 7.0)
+	PlanMonde.disque(Vector2(PLACE.x, PLACE.z), 15.0, 1)
+	PlanMonde.disque(Vector2(PORTAIL.x, PORTAIL.z + 4.0), 10.0, 1, 0.75, 8.0)
+	PlanMonde.reserver_disque(Vector2(SANCTUAIRE.x, SANCTUAIRE.z), 13.0)
+	PlanMonde.reserver_disque(Vector2(CLAIRIERE.x, CLAIRIERE.z), 14.0)
+	PlanMonde.reserver(TERRES.grow(5.0))
+	PlanMonde.peindre_lac()
+	bourgs = Bourgs.new()
+	bourgs.construire(self)
+	# 2. le reste du décor
 	_sol()
 	_bordures()
 	_sanctuaire()
@@ -86,10 +86,91 @@ func _ready() -> void:
 	_bourg()
 	_portail()
 	_lanternes_du_chemin()
+	_lac()
+	_montagnes()
 	_foret()
 	_herbes()
 	_terres_gatees()
-	_village()
+	# 3. la grille de marche des habitants
+	var t0 := Time.get_ticks_msec()
+	NavMonde.construire(self)
+	print("Monde : décor %d ms, grille de marche %d ms, %d arbres moissonnables" % [t0 - _t_depart, Time.get_ticks_msec() - t0, recoltables.size()])
+
+var bourgs: Bourgs
+
+# =================== fondu des bâtiments qui cachent le héros ===================
+## La caméra regarde du sud : une maison juste au sud du héros le cacherait. On la rend translucide.
+var _fondus := {}            ## case 32 m -> [{n, l, m, v, vise}]
+var _fondu_t := 0.0
+var _fondus_actifs: Array = []
+
+## Le rendu « compatibilité » ignore GeometryInstance3D.transparency : on passe par une copie translucide du matériau.
+func _appliquer_fondu(e: Dictionary, v: float) -> void:
+	for m in e["m"]:
+		if not is_instance_valid(m) or not m is MeshInstance3D:
+			continue
+		var mi := m as MeshInstance3D
+		if v <= 0.001:
+			mi.material_override = null
+			continue
+		var mat: StandardMaterial3D = mi.get_meta("mat_fondu") if mi.has_meta("mat_fondu") else null
+		if mat == null:
+			var src := mi.get_active_material(0)
+			mat = (src.duplicate() if src is StandardMaterial3D else StandardMaterial3D.new()) as StandardMaterial3D
+			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			mat.cull_mode = BaseMaterial3D.CULL_BACK
+			mi.set_meta("mat_fondu", mat)
+		mat.albedo_color.a = 1.0 - v
+		mi.material_override = mat
+
+func fondu_ajouter(n: Node3D, demi_largeur: float) -> void:
+	var cle := Vector2i(floori(n.position.x / 32.0), floori(n.position.z / 32.0))
+	if not _fondus.has(cle):
+		_fondus[cle] = []
+	_fondus[cle].append({"n": n, "l": demi_largeur, "m": n.find_children("*", "GeometryInstance3D", true, false), "v": 0.0, "vise": 0.0})
+
+func _process(delta: float) -> void:
+	_fondu_t -= delta
+	var j = Jeu.joueur
+	if j == null or not is_instance_valid(j):
+		return
+	var foyer: Vector3 = Pouvoirs.moi.controle.global_position if Pouvoirs.moi and Pouvoirs.moi.controle else j.global_position
+	if _fondu_t <= 0.0:
+		_fondu_t = 0.12
+		for e in _fondus_actifs:
+			e["vise"] = 0.0
+		var c0 := Vector2i(floori(foyer.x / 32.0), floori(foyer.z / 32.0))
+		for dy in [-1, 0, 1]:
+			for dx in [-1, 0, 1]:
+				for e in _fondus.get(c0 + Vector2i(dx, dy), []):
+					var p: Vector3 = e["n"].position
+					var l: float = e["l"]
+					if p.z + l * 0.4 > foyer.z + 0.5 and p.z - l < foyer.z + 11.0 and absf(p.x - foyer.x) < l + 2.5:
+						e["vise"] = 0.62
+						if not _fondus_actifs.has(e):
+							_fondus_actifs.append(e)
+	var restent: Array = []
+	for e in _fondus_actifs:
+		var v: float = move_toward(e["v"], e["vise"], delta * 3.0)
+		if v != e["v"]:
+			e["v"] = v
+			_appliquer_fondu(e, v)
+		if v > 0.0 or e["vise"] > 0.0:
+			restent.append(e)
+	_fondus_actifs = restent
+
+## Accès publics pour les bâtisseurs (Bourgs).
+func boite_collision(centre: Vector3, taille: Vector3, rot_y := 0.0) -> void:
+	_boite_collision(centre, taille, rot_y)
+
+func cylindre_collision(pos: Vector3, r: float, hauteur: float) -> StaticBody3D:
+	return _cylindre_collision(pos, r, hauteur)
+
+func feu_de_camp(p: Vector3) -> void:
+	_feu_de_camp(p)
+
+func feu(p: Vector3, taille: float) -> void:
+	_feu(p, taille)
 
 # =================== briques ===================
 
@@ -136,7 +217,13 @@ func _aabb(n: Node, xf: Transform3D, acc: Array, racine := false) -> void:
 	for c in n.get_children():
 		_aabb(c, t, acc)
 
+## Obstacles connus de la grille de marche : [centre, taille, rot_y] et [pos, rayon] pour les cylindres.
+var obstacles: Array = []
+var obstacles_ronds: Array = []
+
 func _boite_collision(centre: Vector3, taille: Vector3, rot_y := 0.0) -> void:
+	if taille.y > 0.4 and centre.y > -0.2:
+		obstacles.append([centre, taille, rot_y])
 	var corps := StaticBody3D.new()
 	var f := CollisionShape3D.new()
 	var b := BoxShape3D.new()
@@ -148,6 +235,7 @@ func _boite_collision(centre: Vector3, taille: Vector3, rot_y := 0.0) -> void:
 	corps.rotation.y = rot_y
 
 func _cylindre_collision(pos: Vector3, rayon: float, hauteur: float) -> StaticBody3D:
+	obstacles_ronds.append([pos, rayon])
 	var corps := StaticBody3D.new()
 	var f := CollisionShape3D.new()
 	var c := CylinderShape3D.new()
@@ -249,43 +337,6 @@ static func _dist_ligne(p: Vector2, pts: Array) -> float:
 		m = minf(m, p.distance_to(a + ab * t))
 	return m
 
-# =================== Hameau de Brekka ===================
-
-func _village() -> void:
-	var B := H + "buildings/blue/"
-	var N := H + "buildings/neutral/"
-	var P := H + "decoration/props/"
-	for m in MAISONS:
-		poser(B + m[0] + ".gltf", m[1], m[2], 6.2 if m[0].contains("tavern") else 6.4, "boite")
-	# moulin, scierie, champs de blé, puits : chacun a son travail
-	poser(B + "building_windmill_blue.gltf", Vector3(31, 0, 6), 20.0, 6.0, "boite")
-	poser(B + "building_lumbermill_blue.gltf", Vector3(75, 0, 8), -60.0, 6.0, "boite")
-	poser(B + "building_well_blue.gltf", PLACE_VILLAGE + Vector3(0, 0, -1.5), 0.0, 4.2, "boite")
-	for c in [Vector3(30, 0, 27), Vector3(37, 0, 30), Vector3(30, 0, 34)]:
-		poser(N + "building_grain.gltf", c, 0.0, 5.0)
-	poser(R + "Wood_Log_Stack.gltf", Vector3(71, 0, 13), 30.0, 1.6, "boite")
-	poser(R + "Wood_Log_Stack.gltf", Vector3(73.5, 0, 15), 80.0, 1.4, "boite")
-	poser(P + "crate_A_big.gltf", Vector3(57, 0, 2.5), 20.0, 6.0, "boite")
-	poser(P + "sack.gltf", Vector3(48.5, 0, 2.0), 0.0, 6.0, "boite")
-	poser(P + "wheelbarrow.gltf", Vector3(33.5, 0, 24.0), 40.0, 6.0, "boite")
-	poser(N + "building_scaffolding.gltf", Vector3(62, 0, 28), 0.0, 5.5, "boite")
-	_feu_de_camp(PLACE_VILLAGE + Vector3(0, 0, 6))
-	for a in [0.4, 2.0, 3.6, 5.1]:
-		var p := PLACE_VILLAGE + Vector3(0, 0, 6) + Vector3(cos(a), 0, sin(a)) * 3.6
-		poser(HW + "bench.gltf", p, rad_to_deg(-a) + 90.0, 0.9, "boite")
-	# sentier vers le chemin principal
-	for i in ROUTE_VILLAGE.size() - 1:
-		var a: Vector2 = ROUTE_VILLAGE[i]
-		var b: Vector2 = ROUTE_VILLAGE[i + 1]
-		var n := int(a.distance_to(b) / 2.6)
-		for k in n + 1:
-			var q := a.lerp(b, float(k) / maxf(n, 1))
-			poser(HW + "floor_dirt_small.gltf", Vector3(q.x, 0.02, q.y), _rng.randf_range(0, 360), 1.5)
-	for p in [PLACE_VILLAGE + Vector3(-7, 0, 9), PLACE_VILLAGE + Vector3(7, 0, 9), Vector3(57, 0, 32)]:
-		poser(HW + "post_lantern.gltf", p, 0.0, 1.0, "tronc")
-		lumiere(p + Vector3(0, 3.1, 0.6), Color(1.0, 0.78, 0.45), 1.3, 9.0)
-	lumiere(PLACE_VILLAGE + Vector3(0, 6, 0), Color(1.0, 0.85, 0.6), 1.2, 24.0)
-
 static func _dist_route(p: Vector2) -> float:
 	var m := 1e9
 	for i in ROUTE_TERRES.size() - 1:
@@ -386,7 +437,7 @@ func abattre(r: Dictionary) -> void:
 	mm.set_instance_transform(r["i"], Transform3D().scaled(Vector3(0.001, 0.001, 0.001)))
 	var corps = r["corps"]
 	if corps and is_instance_valid(corps):
-		corps.collision_layer = 0
+		corps.set_deferred("disabled", true)
 	var vrai: Node3D = _scene(r["chemin"]).instantiate()
 	teinter(vrai, TEINTE_BOIS_MORT if r["chemin"].contains("Bare") else TEINTE_FORET)
 	vrai.transform = r["xf"]
@@ -415,7 +466,7 @@ func _repousser(r: Dictionary) -> void:
 		r["abattu"] = false
 		var corps = r["corps"]
 		if corps and is_instance_valid(corps):
-			corps.collision_layer = 1)
+			corps.set_deferred("disabled", false))
 
 static func distance_chemin(p: Vector2) -> Array:
 	var meilleur := 1e9
@@ -433,33 +484,26 @@ static func distance_chemin(p: Vector2) -> Array:
 	return [meilleur, proj]
 
 static func lieu_de(p: Vector3) -> Dictionary:
-	for l in LIEUX:
-		if Vector2(p.x - l["centre"].x, p.z - l["centre"].z).length() <= l["rayon"]:
-			return l
-	return {}
+	return PlanMonde.lieu_de(p)
 
 # =================== sol et bords ===================
 
 func _sol() -> void:
 	var plan := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
-	pm.size = Vector2(LIMITES.size.x + 120, LIMITES.size.y + 120)
+	pm.size = Vector2(LIMITES.size.x + 160, LIMITES.size.y + 160)
+	pm.subdivide_width = 8
+	pm.subdivide_depth = 8
 	plan.mesh = pm
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://shaders/sol_surface.gdshader")
-	var pts := PackedVector2Array()
-	for p in CHEMIN:
-		pts.append(p)
-	mat.set_shader_parameter("chemin", pts)
-	mat.set_shader_parameter("nb_points", pts.size())
-	mat.set_shader_parameter("place", Vector4(PLACE.x, PLACE.z, 15.0, 0))
+	mat.set_shader_parameter("masque", ImageTexture.create_from_image(PlanMonde.masque))
+	mat.set_shader_parameter("monde", Vector4(LIMITES.position.x, LIMITES.position.y, LIMITES.size.x, LIMITES.size.y))
 	mat.set_shader_parameter("sanctuaire", Vector4(SANCTUAIRE.x, SANCTUAIRE.z, 8.5, 0))
-	mat.set_shader_parameter("parvis_portail", Vector4(PORTAIL.x, PORTAIL.z + 4.0, 10.0, 0))
-	mat.set_shader_parameter("bourg", Vector4(BOURG.position.x, BOURG.position.y, BOURG.end.x, BOURG.end.y))
 	plan.material_override = mat
 	plan.position = Vector3(LIMITES.get_center().x, 0, LIMITES.get_center().y)
 	add_child(plan)
-	_boite_collision(Vector3(LIMITES.get_center().x, -0.5, LIMITES.get_center().y), Vector3(LIMITES.size.x + 120, 1, LIMITES.size.y + 120))
+	_boite_collision(Vector3(LIMITES.get_center().x, -0.5, LIMITES.get_center().y), Vector3(LIMITES.size.x + 160, 1, LIMITES.size.y + 160))
 
 func _bordures() -> void:
 	# murs invisibles : la forêt dense et les montagnes font le bord visible
@@ -603,7 +647,8 @@ func _palissade(a: Vector3, b: Vector3, ouvertures: Array) -> void:
 			if coord > o.x and coord < o.y:
 				ouvert = true
 		if not ouvert:
-			poser(H + "buildings/neutral/fence_wood_straight.gltf", abs_t, rot, 5.0)
+			# le modèle est posé sur le bord d'un hexagone : on le recentre sur la ligne
+			poser(H + "buildings/neutral/fence_wood_straight.gltf", abs_t + Basis(Vector3.UP, deg_to_rad(rot)) * Vector3(5.25, 0, 0), rot, Vector3(5.0, 5.0, pas / 1.155))
 			var taille := Vector3(0.8, 3.0, pas) if rot == 0.0 else Vector3(pas, 3.0, 0.8)
 			_boite_collision(abs_t + Vector3(0, 1.5, 0), taille)
 		t += pas
@@ -760,23 +805,44 @@ func _lanternes_du_chemin() -> void:
 			prochain += 22.0
 		cumul += l
 
-## Libre pour un arbre ? Couloir du chemin dégagé, rien au sud du chemin à moins de 12 m (la caméra regarde du sud).
+## Libre pour un arbre ? Rien sur les routes, les villes, le lac ; et jamais juste au sud d'une route
+## (la caméra regarde du sud : un arbre là cacherait le héros).
 func _libre(p: Vector2, marge := 0.0) -> bool:
 	var dc := distance_chemin(p)
 	var proj: Vector2 = dc[1]
 	var mini := 7.5 if p.y < proj.y else 12.5
 	if dc[0] < mini + marge:
 		return false
+	if PlanMonde.est_interdit(p):
+		return false
+	var dr := PlanMonde.proj_routes(p)
+	if dr[0] < 4.5 + marge or (p.y > dr[1].y and dr[0] < 9.5 + marge):
+		return false
 	if Rect2(BOURG.position - Vector2(7, 7), BOURG.size + Vector2(14, 14)).has_point(p):
 		return false
-	if TERRES.grow(5.0 + marge).has_point(p) or _dist_route(p) < 5.0 + marge:
+	if p.distance_to(Vector2(PORTAIL.x, PORTAIL.z + 3)) < 17.0 + marge:
 		return false
-	if VILLAGE.grow(4.0 + marge).has_point(p) or _dist_ligne(p, ROUTE_VILLAGE) < 5.0 + marge:
-		return false
-	for z in [[SANCTUAIRE, 13.0], [CLAIRIERE, 14.0], [PORTAIL + Vector3(0, 0, 3), 17.0]]:
-		if p.distance_to(Vector2(z[0].x, z[0].z)) < z[1] + marge:
-			return false
 	return true
+
+## Troncs solides : une forme de collision par arbre, regroupées par case de 64 m (un seul corps par case).
+var _corps_cases := {}
+
+func _tronc(p: Vector2, r := 0.6) -> CollisionShape3D:
+	var cle := Vector2i(floori(p.x / 64.0), floori(p.y / 64.0))
+	if not _corps_cases.has(cle):
+		var corps := StaticBody3D.new()
+		_colliders.add_child(corps)
+		_corps_cases[cle] = corps
+	var f := CollisionShape3D.new()
+	var cy := CylinderShape3D.new()
+	cy.radius = r
+	cy.height = 4.0
+	f.shape = cy
+	f.position = Vector3(p.x, 2.0, p.y)
+	_corps_cases[cle].add_child(f)
+	obstacles_ronds.append([Vector3(p.x, 0, p.y), r])
+	_troncs[Vector2i(roundi(p.x * 10.0), roundi(p.y * 10.0))] = f
+	return f
 
 func _foret() -> void:
 	var types := ["Tree_1_A", "Tree_1_B", "Tree_2_A", "Tree_2_C", "Tree_3_A", "Tree_3_B", "Tree_4_A", "Tree_4_B"]
@@ -784,16 +850,23 @@ func _foret() -> void:
 	for t in types:
 		par_type[t] = []
 	var morts := []
-	var pas := 6.2
-	var x := LIMITES.position.x - 30.0
+	var bruit := FastNoiseLite.new()
+	bruit.seed = 1717
+	bruit.frequency = 0.011
+	var pas := 6.0
+	var x := LIMITES.position.x - 40.0
 	while x < LIMITES.end.x + 40.0:
-		var z := LIMITES.position.y - 34.0
-		while z < LIMITES.end.y + 30.0:
+		var z := LIMITES.position.y - 40.0
+		while z < LIMITES.end.y + 34.0:
 			var p := Vector2(x + _rng.randf_range(-2.2, 2.2), z + _rng.randf_range(-2.2, 2.2))
 			z += pas
 			if not _libre(p):
 				continue
-			# clairsemé au bord du couloir, dense au loin
+			var dedans := LIMITES.has_point(p)
+			# prairies et lisières : le monde respire entre les bois
+			var n := bruit.get_noise_2d(p.x, p.y)
+			if dedans and (n > 0.2 or (n > 0.05 and _rng.randf() < 0.55)):
+				continue
 			var dc: float = distance_chemin(p)[0]
 			if dc < 16.0 and _rng.randf() < 0.35:
 				continue
@@ -805,13 +878,28 @@ func _foret() -> void:
 				morts.append(xf)
 			else:
 				par_type[types[_rng.randi() % types.size()]].append(xf)
-			# troncs solides seulement là où l'on peut marcher
-			if LIMITES.has_point(p) and dc < 30.0:
-				_troncs[Vector2i(roundi(p.x * 10.0), roundi(p.y * 10.0))] = _cylindre_collision(Vector3(p.x, 0, p.y), 0.6, 4.0)
+			if dedans:
+				_tronc(p)
 		x += pas
 	for t in types:
 		_multimesh(F + t + "_Color1.gltf", par_type[t], true, "arbre")
 	_multimesh(F + "Tree_Bare_1_A_Color1.gltf", morts, true, "arbre")
+
+## Rochers moissonnables (carrière) : ils tombent sous les lames et les pioches, puis repoussent.
+func zone_rochers(c: Vector3, r: float, n: int) -> void:
+	var l := {"Rock_1_A": [], "Rock_1_J": [], "Rock_2_A": []}
+	var cles := l.keys()
+	for i in n:
+		var a := _rng.randf() * TAU
+		var d := sqrt(_rng.randf()) * r
+		var p := Vector2(c.x, c.z) + Vector2(cos(a), sin(a)) * d
+		if p.distance_to(Vector2(c.x + 2, c.z - 12)) < 7.0:
+			continue
+		var ech := _rng.randf_range(1.8, 2.8)
+		l[cles[i % cles.size()]].append(Transform3D(Basis(Vector3.UP, _rng.randf_range(0, TAU)).scaled(Vector3.ONE * ech), Vector3(p.x, 0, p.y)))
+		_tronc(p, 0.9)
+	for k in l:
+		_multimesh(F + k + "_Color1.gltf", l[k], true, "rocher")
 
 func _herbes() -> void:
 	var touffes := {"Grass_1_A": [], "Grass_2_B": [], "Grass_1_C": []}
@@ -820,28 +908,28 @@ func _herbes() -> void:
 	var cles_t := touffes.keys()
 	var cles_b := buissons.keys()
 	var cles_r := rochers.keys()
-	for i in 1500:
+	for i in 7000:
 		var p := Vector2(_rng.randf_range(LIMITES.position.x, LIMITES.end.x), _rng.randf_range(LIMITES.position.y, LIMITES.end.y))
 		var dc: float = distance_chemin(p)[0]
 		if dc < 3.3:
 			continue
-		if BOURG.grow(-2).has_point(p) and p.distance_to(Vector2(PLACE.x, PLACE.z)) < 17.0:
+		var m := PlanMonde.lire(p)
+		if m.r > 0.15 or m.g > 0.1 or m.a > 0.05 or m.b > 0.3:
 			continue
 		if p.distance_to(Vector2(PORTAIL.x, PORTAIL.z + 4.0)) < 12.0:
 			continue
 		if TERRES.grow(3.0).has_point(p) or _dist_route(p) < 3.0:
 			continue
-		if _dist_ligne(p, ROUTE_VILLAGE) < 3.0 or (VILLAGE.has_point(p) and p.distance_to(Vector2(PLACE_VILLAGE.x, PLACE_VILLAGE.z)) < 12.0):
-			continue
+		var bati := PlanMonde.est_interdit(p)
 		var base := Transform3D(Basis(Vector3.UP, _rng.randf_range(0, TAU)), Vector3(p.x, 0, p.y))
 		var r := _rng.randf()
-		# herbe surtout le long du chemin : c'est là que le joueur regarde
-		if r < 0.7 and (dc < 14.0 or _rng.randf() < 0.3):
+		# herbe surtout le long des chemins et dans les villages : c'est là que le joueur regarde
+		if r < 0.7 and (dc < 14.0 or bati or _rng.randf() < 0.35):
 			touffes[cles_t[_rng.randi() % cles_t.size()]].append(base.scaled_local(Vector3.ONE * _rng.randf_range(1.5, 2.3)))
 		elif r < 0.9:
-			if dc > 4.5:
+			if dc > 4.5 and not bati:
 				buissons[cles_b[_rng.randi() % cles_b.size()]].append(base.scaled_local(Vector3.ONE * _rng.randf_range(3.0, 4.6)))
-		else:
+		elif not bati:
 			rochers[cles_r[_rng.randi() % cles_r.size()]].append(base.scaled_local(Vector3.ONE * _rng.randf_range(1.0, 1.8)))
 	for k in touffes:
 		_multimesh(F + k + "_Color1.gltf", touffes[k], false)
@@ -849,3 +937,120 @@ func _herbes() -> void:
 		_multimesh(F + k + "_Color1.gltf", buissons[k], false)
 	for k in rochers:
 		_multimesh(F + k + "_Color1.gltf", rochers[k], false, "rocher")
+
+# =================== Lac des Brumes ===================
+
+const PONTON := Rect2(-147, -9.7, 21, 3.4)    ## le ponton de Vik avance sur l'eau
+
+func _lac() -> void:
+	var c := PlanMonde.LAC_CENTRE
+	var rr := PlanMonde.LAC_RAYONS
+	var eau := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = rr * 2.6
+	eau.mesh = pm
+	var sh := Shader.new()
+	sh.code = """
+shader_type spatial;
+render_mode diffuse_lambert, specular_schlick_ggx, cull_disabled;
+uniform vec2 centre;
+uniform vec2 rayons;
+varying vec3 pm;
+float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float b(vec2 p) { vec2 i = floor(p); vec2 f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
+	return mix(mix(h(i), h(i + vec2(1, 0)), u.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), u.x), u.y); }
+void vertex() { pm = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
+void fragment() {
+	vec2 d = (pm.xz - centre) / rayons;
+	float a = atan(d.y, d.x);
+	float k = length(d) / (1.0 + 0.08 * sin(a * 3.0 + 0.6) + 0.05 * sin(a * 7.0));
+	if (k > 1.04) { discard; }
+	float t = TIME * 0.35;
+	float vague = b(pm.xz * 0.35 + vec2(t, t * 0.6)) * 0.6 + b(pm.xz * 1.2 - vec2(t * 1.3, t)) * 0.4;
+	vec3 profond = vec3(0.07, 0.2, 0.26);
+	vec3 clair = vec3(0.22, 0.42, 0.45);
+	float rive = smoothstep(0.78, 1.0, k);
+	vec3 col = mix(profond, clair, rive * 0.8 + vague * 0.25);
+	float ecume = smoothstep(0.94, 1.0, k) * (0.6 + 0.4 * sin(TIME * 1.5 + a * 9.0));
+	col = mix(col, vec3(0.85, 0.9, 0.88), ecume * 0.6);
+	float reflet = pow(vague, 6.0) * 1.4;
+	ALBEDO = col + vec3(reflet) * 0.35;
+	ROUGHNESS = 0.08;
+	METALLIC = 0.0;
+	SPECULAR = 0.7;
+	NORMAL_MAP = vec3(0.5 + (vague - 0.5) * 0.25, 0.5 + (b(pm.xz * 0.9 + t) - 0.5) * 0.25, 1.0);
+	ALPHA = clamp((1.04 - k) / 0.08, 0.0, 0.92);
+}
+"""
+	var mat := ShaderMaterial.new()
+	mat.shader = sh
+	mat.set_shader_parameter("centre", c)
+	mat.set_shader_parameter("rayons", rr)
+	eau.material_override = mat
+	eau.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	eau.position = Vector3(c.x, 0.07, c.y)
+	_decor.add_child(eau)
+	# on ne marche pas sur l'eau : des boîtes qui remplissent le lac, sauf sous le ponton
+	var z := c.y - rr.y * 1.2
+	while z < c.y + rr.y * 1.2:
+		var xs: Array = []
+		var x := c.x - rr.x * 1.2
+		while x < c.x + rr.x * 1.2:
+			if PlanMonde.dans_lac(Vector2(x, z + 1.0), 1.4):
+				xs.append(x)
+			x += 1.0
+		if not xs.is_empty():
+			var bande := Rect2(xs.front(), z, xs.back() - xs.front() + 1.0, 2.0)
+			for morceau in _soustraire(bande, PONTON):
+				_boite_collision(Vector3(morceau.get_center().x, 1.0, morceau.get_center().y), Vector3(morceau.size.x, 2.0, morceau.size.y))
+		z += 2.0
+	# roseaux et nénuphars sur les berges
+	var plantes := ["waterplant_A", "waterplant_B", "waterplant_C"]
+	for i in 70:
+		var a := _rng.randf() * TAU
+		var k := _rng.randf_range(0.86, 1.02)
+		var q := c + Vector2(cos(a) * rr.x, sin(a) * rr.y) * k * (1.0 + 0.08 * sin(a * 3.0 + 0.6) + 0.05 * sin(a * 7.0))
+		if PONTON.grow(2.0).has_point(q):
+			continue
+		poser(H + "decoration/nature/" + plantes[i % 3] + ".gltf", Vector3(q.x, 0.05, q.y), _rng.randf_range(0, 360), _rng.randf_range(3.0, 4.5))
+	for i in 22:
+		var a2 := _rng.randf() * TAU
+		var q2 := c + Vector2(cos(a2) * rr.x, sin(a2) * rr.y) * _rng.randf_range(0.3, 0.8)
+		poser(H + "decoration/nature/" + ["waterlily_A", "waterlily_B"][i % 2] + ".gltf", Vector3(q2.x, 0.09, q2.y), _rng.randf_range(0, 360), _rng.randf_range(3.0, 4.0))
+	lumiere(Vector3(c.x, 8, c.y), Color(0.6, 0.75, 0.9), 0.8, 40.0)
+
+## Rectangle moins un autre : jusqu'à quatre morceaux.
+func _soustraire(r: Rect2, trou: Rect2) -> Array:
+	if not r.intersects(trou):
+		return [r]
+	var res: Array = []
+	var i := r.intersection(trou)
+	if i.position.y > r.position.y:
+		res.append(Rect2(r.position.x, r.position.y, r.size.x, i.position.y - r.position.y))
+	if i.end.y < r.end.y:
+		res.append(Rect2(r.position.x, i.end.y, r.size.x, r.end.y - i.end.y))
+	if i.position.x > r.position.x:
+		res.append(Rect2(r.position.x, i.position.y, i.position.x - r.position.x, i.size.y))
+	if i.end.x < r.end.x:
+		res.append(Rect2(i.end.x, i.position.y, r.end.x - i.end.x, i.size.y))
+	return res.filter(func(q): return q.size.x > 0.2 and q.size.y > 0.2)
+
+# =================== montagnes au bout du monde ===================
+
+func _montagnes() -> void:
+	var modeles := ["mountain_A_grass_trees", "mountain_B_grass_trees", "mountain_C_grass_trees", "mountain_A_grass", "mountain_B_grass"]
+	var r := LIMITES
+	var bords := [[Vector2(r.position.x, r.position.y), Vector2(r.end.x, r.position.y), Vector2(0, -1)],
+		[Vector2(r.position.x, r.position.y), Vector2(r.position.x, r.end.y), Vector2(-1, 0)],
+		[Vector2(r.end.x, r.position.y), Vector2(r.end.x, r.end.y), Vector2(1, 0)]]
+	for b in bords:
+		var a: Vector2 = b[0]
+		var e: Vector2 = b[1]
+		var n: Vector2 = b[2]
+		var l := a.distance_to(e)
+		var t := 0.0
+		while t < l + 40.0:
+			var p: Vector2 = a.lerp(e, t / l) + n * _rng.randf_range(48.0, 70.0)
+			var ech := _rng.randf_range(18.0, 26.0)
+			poser(H + "decoration/nature/" + modeles[_rng.randi() % modeles.size()] + ".gltf", Vector3(p.x, -1.0, p.y), _rng.randf_range(0, 360), ech)
+			t += _rng.randf_range(26.0, 38.0)

@@ -54,6 +54,9 @@ func _ready() -> void:
 		_test_chef()
 	if "--test-village" in OS.get_cmdline_user_args():
 		_test_village()
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--perf="):
+			_test_perf(a.substr(7))
 	if "--test-pouvoirs" in OS.get_cmdline_user_args():
 		_test_pouvoirs()
 	if "--test-boucle" in OS.get_cmdline_user_args():
@@ -168,6 +171,9 @@ func _construire() -> void:
 		add_child(sd)
 		sd.demarrer(self, joueur, hud)
 	if carte == "surface":
+		var pantins := Pantins.new()
+		pantins.name = "Pantins"
+		add_child(pantins)
 		var sc := Node.new()
 		sc.set_script(load("res://scripts/surface/scenario.gd"))
 		sc.name = "Scenario"
@@ -638,30 +644,87 @@ func _test_pouvoirs() -> void:
 func _test_village() -> void:
 	await get_tree().create_timer(1.5).timeout
 	joueur.invulnerable_t = 1e9
-	joueur.mana = 100.0
-	joueur.global_position = Vector3(53, 0.1, 26)
-	await get_tree().create_timer(3.0).timeout
+	joueur.mana = 400.0
+	joueur.mana_max = 400.0
+	var lieu := Vector3(53, 0.1, 26)
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--lieu="):
+			var q := a.substr(7).split(",")
+			lieu = Vector3(float(q[0]), 0.1, float(q[1]))
+	joueur.global_position = lieu
+	await get_tree().create_timer(4.0).timeout
+	var par := {}
+	for v in Village.moi.habitants:
+		par[v.colonie.id] = par.get(v.colonie.id, 0) + 1
+	printerr("TEST habitants=", Village.moi.habitants.size(), " ", par, " gardes=", Village.moi.gardes.size(), " pillards=", Village.moi.pillards.size(), " heure=", Village.moi.texte_heure())
 	await _cap("village")
-	printerr("TEST habitants=", Village.moi.habitants.size(), " heure=", Village.moi.texte_heure())
+	# un pantin, qui coupe du bois
 	Pouvoirs.moi.lancer("esprit")
-	await get_tree().create_timer(2.0).timeout
-	var v: Villageois = Pouvoirs.moi.controle
-	printerr("TEST contrôle=", v.nom if v else "aucun")
-	await _cap("esprit")
+	await get_tree().create_timer(1.5).timeout
+	Pantins.moi.fermer()
+	var p: Villageois = Pantins.moi.liste[0] if not Pantins.moi.liste.is_empty() else null
+	printerr("TEST pantin=", p.nom if p else "aucun")
+	if p == null:
+		get_tree().quit()
+		return
+	await _cap("pantin")
+	var bois0 := 0
+	for o in Profil.p().coffre["objets"]:
+		if o["id"] == "bois":
+			bois0 = o["qte"]
+	Pantins.moi.ordonner(p, {"id": "bois", "centre": p.global_position})
+	await get_tree().create_timer(16.0).timeout
+	await _cap("pantin_bois")
+	var bois1 := 0
+	for o in Profil.p().coffre["objets"]:
+		if o["id"] == "bois":
+			bois1 = o["qte"]
+	printerr("TEST bois coffre ", bois0, " -> ", bois1, " ordre=", p.ordre.get("id"), " tache=", p._tache, " route=", p.en_route())
+	# cambriolage d'une maison proche, gardes écartés
 	for g in Village.moi.gardes:
-		g.global_position = Vector3(90, 0, 60)
-		g.activite("loin", Vector3(90, 0, 60))
-	var porte: PorteMaison = Village.moi.portes[1]
-	v.global_position = porte.global_position + Vector3(0.5, 0, 0.8)
+		g.global_position = Vector3(-200, 0, 100)
+	var porte = null
+	for pt in get_tree().get_nodes_in_group("portes"):
+		if pt.maison["genre"] == "maison" and pt.maison != p.maison and (porte == null or pt.global_position.distance_to(p.global_position) < porte.global_position.distance_to(p.global_position)):
+			porte = pt
+	var or0: int = joueur.sac.or_
+	Pantins.moi.ordonner(p, {"id": "voler", "maison": porte.maison, "phase": "aller"})
+	for k in 40:
+		await get_tree().create_timer(1.0).timeout
+		if p.ordre.get("id") == "suivre":
+			break
+	printerr("TEST vol : or ", or0, " -> ", joueur.sac.or_, " ordre=", p.ordre.get("id"), " phase=", p.ordre.get("phase", ""))
+	# attaque d'un autre habitant : les gardes interviennent-ils ?
+	var victime: Villageois = null
+	for v in Village.moi.habitants:
+		if v != p and not v.enfant and v.colonie == p.colonie and v.role != "garde":
+			victime = v
+			break
+	Pantins.moi.ordonner(p, {"id": "attaquer", "cible": victime, "retour": {"id": "suivre"}})
+	await get_tree().create_timer(8.0).timeout
+	await _cap("pantin_attaque")
+	printerr("TEST attaque : victime ", victime.nom, " pv=", int(victime.pv), " etat=", victime.etat, " pantin pv=", int(p.pv))
+	# prendre son corps et fouiller
+	Pantins.moi.ordonner(p, {"id": "suivre"})
+	Pouvoirs.moi.prendre_corps(p)
 	await get_tree().create_timer(0.5).timeout
-	await _cap("porte")
-	porte.interagir(joueur)
-	await get_tree().create_timer(3.6).timeout
-	await _cap("vol")
-	var or0 := joueur.sac.or_
+	var porte2 = null
+	for pt in get_tree().get_nodes_in_group("portes"):
+		if pt.maison["genre"] == "maison" and pt.videe_t <= 0.0 and pt.maison.get("videe", 0) < Time.get_ticks_msec():
+			if porte2 == null or pt.global_position.distance_to(p.global_position) < porte2.global_position.distance_to(p.global_position):
+				porte2 = pt
+	for g in Village.moi.gardes:
+		g.global_position = Vector3(-200, 0, 100)
+	p.global_position = porte2.global_position + Vector3(0.3, 0, 0.3)
+	await get_tree().create_timer(0.5).timeout
+	Jeu.hud._chercher_action()
+	printerr("TEST bouton action=", Jeu.hud._action_btn.visible, " texte=", Jeu.hud._action_lab.text)
+	Jeu.hud._agir()
+	await get_tree().create_timer(3.8).timeout
+	var or2: int = joueur.sac.or_
 	Pouvoirs.moi.rompre_controle()
 	await get_tree().create_timer(0.5).timeout
-	printerr("TEST or ", or0, " -> ", joueur.sac.or_, " sac=", joueur.sac.objets.map(func(o): return o["nom"]))
+	printerr("TEST fouille : or ", or2, " -> ", joueur.sac.or_)
 	get_tree().quit()
 
 func _test_chef() -> void:
@@ -686,6 +749,41 @@ func _test_chef() -> void:
 	await get_tree().create_timer(0.5).timeout
 	await _cap("chef_gestion")
 	printerr("TEST grenier=", Hameau.etat()["stock"], " prod=", Hameau.production())
+	get_tree().quit()
+
+## Mesure du temps de script par image à un endroit (moyenne sur 3 s).
+func _mesurer(n := 90) -> float:
+	var tt := 0.0
+	for k in n:
+		await get_tree().process_frame
+		tt += Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+	return snappedf(tt / n, 0.01)
+
+func _test_perf(ou: String) -> void:
+	await get_tree().create_timer(1.0).timeout
+	joueur.invulnerable_t = 1e9
+	for lieu in ou.split(";"):
+		var q := lieu.split(",")
+		joueur.global_position = Vector3(float(q[0]), 0.1, float(q[1]))
+		await get_tree().create_timer(2.0).timeout
+		var a1 := await _mesurer()
+		var vs := get_tree().get_nodes_in_group("villageois")
+		for v in vs:
+			v.set_process(false)
+		var b1 := await _mesurer()
+		for v in vs:
+			v.process_mode = Node.PROCESS_MODE_DISABLED
+		var c1 := await _mesurer()
+		for v in vs:
+			v.process_mode = Node.PROCESS_MODE_INHERIT
+			v.set_process(true)
+		var a2 := await _mesurer()
+		for d in get_tree().get_nodes_in_group("monstre"):
+			d.process_mode = Node.PROCESS_MODE_DISABLED
+		var m1 := await _mesurer()
+		for d in get_tree().get_nodes_in_group("monstre"):
+			d.process_mode = Node.PROCESS_MODE_INHERIT
+		printerr("PERF ", lieu, " normal=", a1, " sans_script=", b1, " desactives=", c1, " normal2=", a2, " sans_monstres=", m1, " chemins=", NavMonde.mesure_n, "/", NavMonde.mesure_us / 1000, "ms")
 	get_tree().quit()
 
 func _cap(nom: String) -> void:

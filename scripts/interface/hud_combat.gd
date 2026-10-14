@@ -472,13 +472,13 @@ func _input(event: InputEvent) -> void:
 func _chercher_action() -> void:
 	var meilleur: Node = null
 	var d := 99.0
+	var acteur: Node3D = Pouvoirs.moi.controle if Pouvoirs.moi and Pouvoirs.moi.controle else heros
 	for o in get_tree().get_nodes_in_group("interactif"):
-		if not o.disponible():
-			continue
-		var acteur: Node3D = Pouvoirs.moi.controle if Pouvoirs.moi and Pouvoirs.moi.controle else heros
 		var l: float = Vector2(o.global_position.x - acteur.global_position.x, o.global_position.z - acteur.global_position.z).length()
+		if l > 6.0:
+			continue
 		var portee: float = o.get("rayon_action") if o.get("rayon_action") != null else o.rayon
-		if l < portee and l < d:
+		if l < portee and l < d and o.disponible():
 			d = l
 			meilleur = o
 	_action_cible = meilleur

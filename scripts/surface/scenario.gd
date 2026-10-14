@@ -123,23 +123,43 @@ func _minicarte() -> void:
 	var pts: Array = []
 	for p in CarteSurface.CHEMIN:
 		pts.append(p)
+	var lac: Array = []
+	for i in 28:
+		var a := TAU * i / 28.0
+		lac.append(PlanMonde.LAC_CENTRE + Vector2(cos(a) * PlanMonde.LAC_RAYONS.x, sin(a) * PlanMonde.LAC_RAYONS.y) * (1.0 + 0.08 * sin(a * 3.0 + 0.6) + 0.05 * sin(a * 7.0)))
 	mc.formes = [
-		{"type": "rect", "r": Rect2(-40, -40, 260, 220), "couleur": Color(0.11, 0.18, 0.11)},
+		{"type": "rect", "r": PlanMonde.LIMITES.grow(60), "couleur": Color(0.11, 0.18, 0.11)},
+		{"type": "poly", "pts": lac, "couleur": Color(0.16, 0.32, 0.38)},
+		{"type": "rect", "r": PlanMonde.CHAMPS_JARNBORG, "couleur": Color(0.42, 0.38, 0.2)},
 		{"type": "cercle", "c": Vector2(CarteSurface.SANCTUAIRE.x, CarteSurface.SANCTUAIRE.z), "r": 11.0, "couleur": Color(0.22, 0.32, 0.18)},
 		{"type": "cercle", "c": Vector2(CarteSurface.CLAIRIERE.x, CarteSurface.CLAIRIERE.z), "r": 12.0, "couleur": Color(0.22, 0.32, 0.18)},
 		{"type": "rect", "r": CarteSurface.BOURG, "couleur": Color(0.36, 0.29, 0.2)},
 		{"type": "cercle", "c": Vector2(CarteSurface.PLACE.x, CarteSurface.PLACE.z), "r": 14.0, "couleur": Color(0.48, 0.44, 0.38)},
-		{"type": "ligne", "pts": pts, "couleur": Color(0.78, 0.66, 0.46), "largeur": 3.0},
+		{"type": "rect", "r": PlanMonde.JARNBORG, "couleur": Color(0.42, 0.4, 0.36)},
+		{"type": "rect", "r": PlanMonde.BREKKA, "couleur": Color(0.34, 0.3, 0.22)},
+		{"type": "rect", "r": PlanMonde.VIK, "couleur": Color(0.3, 0.33, 0.24)},
+		{"type": "rect", "r": PlanMonde.HRAFN, "couleur": Color(0.36, 0.15, 0.12)},
+		{"type": "cercle", "c": Vector2(PlanMonde.SKARN.x, PlanMonde.SKARN.z), "r": 18.0, "couleur": Color(0.36, 0.15, 0.12)},
 		{"type": "rect", "r": CarteSurface.TERRES, "couleur": Color(0.28, 0.13, 0.1)},
+		{"type": "ligne", "pts": pts, "couleur": Color(0.78, 0.66, 0.46), "largeur": 3.0},
 		{"type": "ligne", "pts": CarteSurface.ROUTE_TERRES, "couleur": Color(0.6, 0.45, 0.35), "largeur": 2.0},
 	]
+	for r in PlanMonde.ROUTES:
+		mc.formes.append({"type": "ligne", "pts": r[0], "couleur": Color(0.72, 0.6, 0.42), "largeur": 2.4})
+	mc.formes.append({"type": "ligne", "pts": [Vector2(-135, -103), Vector2(-135, -180)], "couleur": Color(0.6, 0.58, 0.54), "largeur": 2.4})
+	mc.formes.append({"type": "ligne", "pts": [Vector2(-72, -150), Vector2(-196, -150)], "couleur": Color(0.6, 0.58, 0.54), "largeur": 2.4})
 	mc.lieux = [
 		{"c": Vector2(CarteSurface.SANCTUAIRE.x, CarteSurface.SANCTUAIRE.z), "genre": "sanctuaire"},
 		{"c": Vector2(CarteSurface.PLACE.x, CarteSurface.PLACE.z), "genre": "sur"},
 		{"c": Vector2(CarteSurface.PORTAIL.x, CarteSurface.PORTAIL.z), "genre": "portail"},
 		{"c": Vector2(CarteSurface.CLAIRIERE.x, CarteSurface.CLAIRIERE.z), "genre": "danger"},
 		{"c": Vector2(151, 100), "genre": "elite"},
+		{"c": Vector2(PlanMonde.PLACE_JARNBORG.x, PlanMonde.PLACE_JARNBORG.z), "genre": "sur"},
 	]
+	if not Pillards.conquis("hrafn"):
+		mc.lieux.append({"c": Vector2(128, -180), "genre": "elite"})
+	if not Pillards.conquis("skarn"):
+		mc.lieux.append({"c": Vector2(PlanMonde.SKARN.x, PlanMonde.SKARN.z), "genre": "elite"})
 
 func _bloquer(b: bool) -> void:
 	heros.set_physics_process(not b)
@@ -209,9 +229,9 @@ func _process(_d: float) -> void:
 		return
 	_lieux()
 	_t_village -= _d
-	if _lieu_actuel == "village" and village and _t_village <= 0.0:
+	if _lieu_actuel in ["village", "jarnborg", "vik"] and village and _t_village <= 0.0:
 		_t_village = 2.0
-		hud.regler_titre("Hameau de Brekka", village.texte_heure(), Color("#FFE2A0"))
+		hud.regler_titre(CarteSurface.lieu_de(heros.global_position).get("nom", ""), village.texte_heure(), Color("#FFE2A0"))
 	_terres(CarteSurface.TERRES.grow(2.0).has_point(Vector2(heros.global_position.x, heros.global_position.z)))
 	# le Portail se montre : la caméra s'ouvre vers lui quand on approche
 	var cam := get_viewport().get_camera_3d()
@@ -305,6 +325,27 @@ func _lieux() -> void:
 				Profil.p().marquer_vu("village_vu")
 				recit.bandeau("Hameau de Brekka", "Treize habitants, deux gardes, et des maisons pleines…", Color("#FFE2A0"))
 			hud.regler_titre("Hameau de Brekka", village.texte_heure() if village else "", Color("#FFE2A0"))
+		"jarnborg":
+			if not Profil.p().vu("jarnborg_vu"):
+				Profil.p().marquer_vu("jarnborg_vu")
+				recit.bandeau("Jarnborg, la capitale", "Le Jarl, ses huscarls, ses marchés… et des maisons pleines", Color("#FFE2A0"))
+			hud.regler_titre("Jarnborg, la capitale", village.texte_heure() if village else "", Color("#FFE2A0"))
+		"vik":
+			recit.bandeau("Vik du Lac", "Pêcheurs, moulin à eau, et la taverne de l'Anguille", Color("#BFF0D0"))
+			hud.regler_titre("Vik du Lac", village.texte_heure() if village else "", Color("#BFF0D0"))
+		"lac":
+			hud.regler_titre("Le Val des Racines", "Lac des Brumes")
+		"hrafn", "skarn":
+			var conq := Pillards.conquis(id)
+			recit.bandeau(l["nom"], "Conquis — le repaire est à toi" if conq else "Repaire ennemi : ils attaquent à vue", Color("#9DFFC8") if conq else Color("#FF9C8A"))
+			hud.regler_titre(l["nom"], "conquis" if conq else "zone hostile", Color("#9DFFC8") if conq else Color("#FF9C8A"))
+		"carriere":
+			hud.regler_titre("Carrière de Dvalin", "Pierre et minerai")
+		"pierres":
+			recit.bandeau("Pierres d'Odin", "Un vieux cercle. L'air y vibre.", Color("#BFD8FF"))
+			hud.regler_titre("Pierres d'Odin", "")
+		"tour":
+			hud.regler_titre("Tour du Guet", "ruines")
 		"bourg":
 			recit.bandeau("Bourg de Skjold", "Zone sûre — les armes restent au fourreau", Color("#9DFFC8"))
 			hud.regler_titre("Bourg de Skjold", "Zone sûre", Color("#9DFFC8"))

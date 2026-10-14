@@ -96,6 +96,56 @@ const TYPES := {
 			 "portee_min": 9.0, "portee_max": 18.0, "bond": true, "etourdir": 0.8},
 		],
 	},
+	# --- pillards (humains) des lieux hostiles de la surface ---
+	"pillard": {
+		"nom": "Pillard de Hrafn", "modele": "barbare.glb", "arme_d": "res://assets/armes/axe_1handed.gltf", "arme_g": "", "humain": true,
+		"pv": 460.0, "vitesse": 3.5, "echelle": 1.0, "portee": 2.0, "garde": 0.0, "armure": false, "garde_casque": true,
+		"attaques": [
+			{"id": "taille", "forme": "cone", "rayon": 2.4, "angle": 0.9, "prep": 0.7, "degats": 95.0,
+			 "anim": "1H_Melee_Attack_Chop", "impact_anim": 0.42, "recup": 0.7, "cd": 1.7, "son": "taille"},
+		],
+	},
+	"archer_pillard": {
+		"nom": "Arbalétrier pillard", "modele": "marchand.glb", "arme_d": "res://assets/armes/crossbow_1handed.gltf", "arme_g": "", "humain": true,
+		"pv": 300.0, "vitesse": 3.2, "echelle": 1.0, "portee": 11.0, "garde": 6.5, "armure": false,
+		"attaques": [
+			{"id": "carreau", "forme": "ligne", "rayon": 14.0, "angle": 0.9, "prep": 1.0, "degats": 130.0,
+			 "anim": "1H_Ranged_Shoot", "impact_anim": 0.45, "recup": 0.8, "cd": 3.0, "son": "metal", "projectile": true},
+		],
+	},
+	"brigand": {
+		"nom": "Brigand de Skarn", "modele": "paysan.glb", "arme_d": "res://assets/armes/dagger.gltf", "arme_g": "", "humain": true,
+		"pv": 340.0, "vitesse": 3.8, "echelle": 1.0, "portee": 1.9, "garde": 0.0, "armure": false, "teinte": Color(0.45, 0.32, 0.28),
+		"attaques": [
+			{"id": "estoc", "forme": "cone", "rayon": 2.2, "angle": 0.8, "prep": 0.6, "degats": 80.0,
+			 "anim": "1H_Melee_Attack_Stab", "impact_anim": 0.35, "recup": 0.6, "cd": 1.4, "son": "taille"},
+		],
+	},
+	"hrafn": {
+		"nom": "Hrafn le Borgne", "modele": "barbare.glb", "arme_d": "res://assets/armes/axe_1handed.gltf", "arme_g": "res://assets/armes/shield_round.gltf",
+		"humain": true, "garde_casque": true, "pv": 3200.0, "vitesse": 3.2, "echelle": 1.35, "portee": 2.8, "garde": 0.0, "armure": true, "elite": true,
+		"attaques": [
+			{"id": "fendre", "forme": "cone", "rayon": 3.6, "angle": 1.0, "prep": 1.0, "degats": 260.0,
+			 "anim": "1H_Melee_Attack_Chop", "impact_anim": 0.42, "recup": 0.9, "cd": 2.3, "son": "coup_lourd"},
+			{"id": "tourbillon", "forme": "cercle", "rayon": 4.4, "angle": 0.0, "prep": 1.3, "degats": 300.0,
+			 "anim": "2H_Melee_Attack_Spin", "impact_anim": 0.9, "recup": 1.3, "cd": 8.0, "son": "coup_lourd",
+			 "sur_soi": true, "portee_min": 0.0, "portee_max": 4.2},
+			{"id": "saut", "forme": "cercle", "rayon": 3.2, "angle": 0.0, "prep": 1.15, "degats": 280.0,
+			 "anim": "1H_Melee_Attack_Jump_Chop", "impact_anim": 0.72, "recup": 1.3, "cd": 9.0, "son": "atterrissage",
+			 "portee_min": 5.0, "portee_max": 10.0, "bond": true, "etourdir": 0.7},
+		],
+	},
+	"skarn": {
+		"nom": "Skarn l'Égorgeur", "modele": "marchand.glb", "arme_d": "res://assets/armes/dagger.gltf", "arme_g": "res://assets/armes/dagger.gltf",
+		"humain": true, "pv": 2300.0, "vitesse": 4.0, "echelle": 1.25, "portee": 2.2, "garde": 0.0, "armure": false, "elite": true,
+		"attaques": [
+			{"id": "estoc", "forme": "cone", "rayon": 2.6, "angle": 0.9, "prep": 0.65, "degats": 190.0,
+			 "anim": "Dualwield_Melee_Attack_Stab", "impact_anim": 0.35, "recup": 0.6, "cd": 1.3, "son": "taille"},
+			{"id": "saut", "forme": "cercle", "rayon": 3.0, "angle": 0.0, "prep": 1.0, "degats": 240.0,
+			 "anim": "1H_Melee_Attack_Jump_Chop", "impact_anim": 0.72, "recup": 1.1, "cd": 7.0, "son": "atterrissage",
+			 "portee_min": 4.5, "portee_max": 9.0, "bond": true, "etourdir": 0.6},
+		],
+	},
 	"mage": {
 		"nom": "Draugr nécromant", "modele": "squelette_mage.glb", "arme_d": "skeleton_staff.glb", "arme_g": "",
 		"pv": 240.0, "vitesse": 2.7, "echelle": 1.0, "portee": 10.0, "garde": 6.0, "armure": false,
@@ -108,6 +158,17 @@ const TYPES := {
 }
 
 signal reveille(d: Draugr)
+
+## Les humains n'ont pas les animations propres aux squelettes : on traduit.
+const ANIM_HUMAIN := {"Walking_D_Skeletons": "Walking_A", "Death_C_Skeletons": "Death_A", "Idle_Combat": "2H_Melee_Idle", "Taunt": "Cheer",
+	"Spawn_Ground_Skeletons": "Idle"}
+const CACHES_HUMAIN := ["Knife_Offhand", "1H_Crossbow", "2H_Crossbow", "Knife", "Throwable", "1H_Axe_Offhand", "Barbarian_Round_Shield", "Mug", "1H_Axe", "2H_Axe",
+	"Spellbook", "Spellbook_open", "1H_Wand", "2H_Staff", "1H_Sword_Offhand", "Badge_Shield", "Rectangle_Shield", "Round_Shield", "Spike_Shield", "1H_Sword", "2H_Sword"]
+
+func jouer(nom: String, fondu := 0.12, vitesse_anim := 1.0, verrou := 0.0) -> void:
+	if fiche.get("humain", false):
+		nom = ANIM_HUMAIN.get(nom, nom)
+	super.jouer(nom, fondu, vitesse_anim, verrou)
 
 var type := "minion"
 var fiche: Dictionary
@@ -143,7 +204,16 @@ func _ready() -> void:
 	super._ready()
 	collision_layer = 2
 	collision_mask = 1
-	installer_modele(load(P + fiche["modele"]), fiche["echelle"])
+	installer_modele(load(P + fiche["modele"]), fiche["echelle"], CACHES_HUMAIN if fiche.get("humain", false) else [])
+	if fiche.has("teinte"):
+		for m in modele.find_children("*Body*", "MeshInstance3D", true, false):
+			var mi := m as MeshInstance3D
+			for k in mi.mesh.get_surface_count():
+				var src = mi.get_active_material(k)
+				if src is StandardMaterial3D:
+					var c2: StandardMaterial3D = src.duplicate()
+					c2.albedo_color = fiche["teinte"]
+					mi.set_surface_override_material(k, c2)
 	_armer("handslot.r", fiche["arme_d"])
 	_armer("handslot.l", fiche["arme_g"])
 	var f := CollisionShape3D.new()
@@ -184,7 +254,7 @@ func _armer(os: String, glb: String) -> void:
 	var at := BoneAttachment3D.new()
 	at.bone_name = nom_os
 	sq.add_child(at)
-	var arme: Node3D = load(P + glb).instantiate()
+	var arme: Node3D = load(glb if glb.begins_with("res://") else P + glb).instantiate()
 	at.add_child(arme)
 	for m in arme.find_children("*", "MeshInstance3D", true, false):
 		(m as MeshInstance3D).material_overlay = _mat_flash
@@ -204,6 +274,10 @@ func en_combat() -> bool:
 func reveiller(c: EntiteCombat) -> void:
 	if etat != "dort" or est_mort:
 		return
+	if _figé:
+		_figé = false
+		if anim:
+			anim.active = true
 	cible = c
 	etat = "eveil"
 	_etat_t = 0.0
@@ -224,6 +298,10 @@ func _verifier_aggro() -> void:
 	for h in get_tree().get_nodes_in_group("joueur"):
 		if not h.est_mort and h.is_physics_processing() and global_position.distance_to(h.global_position) < aggro_rayon and not ZoneSure.contient(h.global_position):
 			reveiller(h)
+			return
+	for v in get_tree().get_nodes_in_group("pantin"):
+		if not v.est_mort and not v.cache and global_position.distance_to(v.global_position) < aggro_rayon:
+			reveiller(v)
 			return
 
 # ---------------- attaques ----------------
@@ -521,6 +599,8 @@ func _mourir() -> void:
 	if _aura_noeud:
 		_aura_noeud.visible = false
 	var par_joueur: bool = _dernier_tueur != null and is_instance_valid(_dernier_tueur) and _dernier_tueur == Jeu.joueur
+	if has_meta("chef_de"):
+		Pillards.chef_tombe(self, get_meta("chef_de"))
 	Jeu.evenement("tue", {"type": type, "joueur": par_joueur, "elite": fiche.get("elite", false), "boss": fiche.get("boss", false)})
 	# butin : une bourse au sol (souvent un peu d'or, parfois un objet, très rarement un œuf)
 	if fiche.get("boss", false):
@@ -569,7 +649,11 @@ func _physics_process(delta: float) -> void:
 		return
 	match etat:
 		"dort":
-			_verifier_aggro()
+			_veille_t -= delta
+			if _veille_t <= 0.0:
+				_veille_t = 0.2
+				_veille_lointaine()
+				_verifier_aggro()
 			return
 		"eveil":
 			if _etat_t >= 1.6:
@@ -602,6 +686,21 @@ func _physics_process(delta: float) -> void:
 			_poursuivre(delta)
 		"retour":
 			_retourner(delta)
+
+## Endormi et loin du joueur : on fige l'animation (rien à voir, beaucoup à économiser).
+var _figé := false
+var _veille_t := randf() * 0.2
+
+func _veille_lointaine() -> void:
+	var j = Jeu.joueur
+	if j == null or not is_instance_valid(j) or anim == null:
+		return
+	var loin := global_position.distance_squared_to(j.global_position) > 45.0 * 45.0
+	if loin != _figé:
+		_figé = loin
+		anim.active = not loin
+		if not fiche.get("enterre", false):
+			modele.visible = not loin
 
 ## La cible s'est réfugiée en zone sûre : on rentre au foyer et on se refait une santé.
 func _retourner(delta: float) -> void:
@@ -638,6 +737,13 @@ func _nouvelle_cible() -> bool:
 		if d < dmin:
 			dmin = d
 			meilleur = h
+	for v in get_tree().get_nodes_in_group("pantin"):
+		if v.est_mort or v.cache:
+			continue
+		var d2 := global_position.distance_to(v.global_position)
+		if d2 < dmin:
+			dmin = d2
+			meilleur = v
 	cible = meilleur
 	return meilleur != null
 

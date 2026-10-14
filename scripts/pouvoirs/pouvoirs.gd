@@ -7,14 +7,14 @@ extends Node
 ##   - Déchaînement : une longue incantation qui pulvérise tout dans un grand rayon.
 
 const LISTE := {
-	"tp": {"nom": "Téléportation", "mana": 30.0, "canal": 1.6, "icone": "res://assets/icones_sorts/pouvoir_tp.svg",
+	"tp": {"nom": "Téléportation", "mana": 30.0, "canal": 0.7, "icone": "res://assets/icones_sorts/pouvoir_tp.svg",
 		"fiche": "Ouvre la grande carte : touche un endroit, ton héros incante et y apparaît."},
-	"lames": {"nom": "Lames de moisson", "mana": 35.0, "canal": 1.2, "icone": "res://assets/icones_sorts/pouvoir_lames.svg",
+	"lames": {"nom": "Lames de moisson", "mana": 35.0, "canal": 0.6, "icone": "res://assets/icones_sorts/pouvoir_lames.svg",
 		"fiche": "Des scies runiques jaillissent et rasent tous les arbres, rochers et filons proches."},
-	"esprit": {"nom": "Contrôle d'esprit", "mana": 40.0, "canal": 1.2, "icone": "res://assets/icones_sorts/pouvoir_esprit.svg",
-		"fiche": "Prends l'esprit du villageois le plus proche pendant 60 s : il marche à ta place, et peut fouiller les maisons."},
-	"dechainement": {"nom": "Déchaînement", "mana": 70.0, "canal": 2.6, "icone": "res://assets/icones_sorts/pouvoir_dechainement.svg",
-		"fiche": "Longue incantation, puis une explosion qui pulvérise tout dans un rayon de 18 m."},
+	"esprit": {"nom": "Pantin", "mana": 40.0, "canal": 0.6, "icone": "res://assets/icones_sorts/pouvoir_esprit.svg",
+		"fiche": "Fais du villageois (ou du garde) le plus proche ton pantin : il obéit à tes ordres — suivre, couper du bois, voler, attaquer… 3 pantins au plus."},
+	"dechainement": {"nom": "Déchaînement", "mana": 70.0, "canal": 1.0, "icone": "res://assets/icones_sorts/pouvoir_dechainement.svg",
+		"fiche": "Incantation que rien ne brise, puis une explosion qui pulvérise tout dans un rayon de 18 m."},
 }
 
 static var moi: Pouvoirs
@@ -36,8 +36,10 @@ func peut(id: String) -> String:
 		return "Impossible maintenant"
 	if Heros.en_epreuve:
 		return "Tes pouvoirs sont scellés ici"
-	if _occupe or h.action != "":
+	if _occupe:
 		return "Déjà en train d'incanter"
+	if h.action != "" and h.action != "canal":
+		return "Termine ton geste d'abord"
 	if h.mana < LISTE[id]["mana"]:
 		return "Pas assez de mana"
 	return ""
@@ -48,6 +50,8 @@ func lancer(id: String) -> void:
 		Jeu.notifier(r, Color("#CFD6EE"))
 		Sons.jouer("refus", h.global_position, -10.0)
 		return
+	if h.action == "canal":
+		h.interrompre()
 	match id:
 		"tp":
 			ouvrir_carte()
@@ -70,7 +74,7 @@ func ouvrir_carte() -> void:
 func _incanter(id: String, couleur: Color) -> bool:
 	var d: Dictionary = LISTE[id]
 	_occupe = true
-	h.canaliser(d["nom"], d["canal"], "Spellcast_Raise")
+	h.canaliser(d["nom"], d["canal"], "Spellcast_Raise", true)
 	_montrer_cercle(couleur, d["canal"])
 	Sons.jouer("activation", h.global_position, -4.0, 0.7)
 	var res: Array = await h.canal_fini
@@ -290,21 +294,43 @@ var _ui_esprit: CanvasLayer
 var _lab_esprit: Label
 
 func _esprit() -> void:
+	if Pantins.moi and Pantins.moi.plein():
+		Jeu.notifier("Tu as déjà %d pantins : libères-en un (touche son médaillon)." % Pantins.MAX, Color("#D9B8FF"))
+		return
 	var cible: Villageois = null
-	var dmin := 30.0
+	var dmin := 22.0
 	for v in get_tree().get_nodes_in_group("villageois"):
-		if v.cache or v.arrete or v.metier == "Garde du hameau":
+		if v.cache or v.arrete or v.pantin or v.est_mort or v.role == "chef":
 			continue
 		var d: float = v.global_position.distance_to(h.global_position)
 		if d < dmin:
 			dmin = d
 			cible = v
 	if cible == null:
-		Jeu.notifier("Aucun esprit à prendre à moins de 30 m", Color("#CFD6EE"))
+		Jeu.notifier("Aucun habitant à moins de 22 m", Color("#CFD6EE"))
 		return
 	if not await _incanter("esprit", Color(0.75, 0.45, 1.0)):
 		return
-	if not is_instance_valid(cible):
+	if not is_instance_valid(cible) or cible.est_mort:
+		return
+	# un fil d'âme violet relie le héros à sa marionnette
+	var dep := h.global_position + Vector3(0, 1.6, 0)
+	var arr := cible.global_position + Vector3(0, 1.6, 0)
+	for k in 8:
+		Effets.etincelles(h.get_parent(), dep.lerp(arr, k / 7.0), Vector3.UP, Color(0.75, 0.45, 1.0), 6, 2.0, "star_06.png", 0.3)
+	Effets.onde(h.get_parent(), cible.global_position, 3.0, Color(0.75, 0.45, 1.0))
+	Sons.jouer("verre_lourd", cible.global_position, 0.0, 0.7)
+	if Pantins.moi and Pantins.moi.ajouter(cible):
+		Profil.p().compter("pantins")
+		cible.dire("Oui… maître.", 2.5)
+		Jeu.notifier("%s est ton pantin. Touche son médaillon à gauche pour lui donner un ordre." % cible.nom, Color("#D9B8FF"))
+		if not Profil.p().vu("tuto_pantin"):
+			Profil.p().marquer_vu("tuto_pantin")
+			Pantins.moi.ouvrir(cible)
+
+## « Prends son corps » : tu marches à la place du pantin (fouiller une maison toi-même, espionner…).
+func prendre_corps(cible: Villageois) -> void:
+	if controle != null or not is_instance_valid(cible) or cible.est_mort:
 		return
 	controle = cible
 	butin_vol = []
@@ -317,7 +343,7 @@ func _esprit() -> void:
 	var cam := get_viewport().get_camera_3d()
 	if cam:
 		cam.set("cible", cible)
-	Jeu.notifier("Tu es dans la tête de %s. Fouille une maison… sans te faire voir des gardes." % cible.nom, Color("#D9B8FF"))
+	Jeu.notifier("Tu es dans le corps de %s. Fouille une maison… sans te faire voir." % cible.nom, Color("#D9B8FF"))
 	_montrer_ui_esprit()
 
 func _montrer_ui_esprit() -> void:

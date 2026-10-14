@@ -3,7 +3,7 @@
 | Dossier | Auteur | Licence | Source |
 | --- | --- | --- | --- |
 | assets/donjon | Kay Lousberg (KayKit Dungeon Remastered 1.0) | CC0 | https://github.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0 |
-| assets/personnages (barbare, chevalier, freya, marchand) | Kay Lousberg (KayKit Adventurers 1.0) | CC0 | https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0 |
+| assets/personnages (barbare, chevalier, freya, marchand, paysan = Rogue sans capuche) | Kay Lousberg (KayKit Adventurers 1.0) | CC0 | https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0 |
 | assets/personnages (squelette_*, skeleton_*) | Kay Lousberg (KayKit Skeletons 1.0) | CC0 | https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Skeletons-1.0 |
 
 Les personnages ont été allégés (animations inutiles retirées), sans autre modification.
@@ -20,7 +20,7 @@ Les personnages ont été allégés (animations inutiles retirées), sans autre 
 
 | Dossier | Source | Licence |
 |---|---|---|
-| assets/surface/hexa | KayKit Medieval Hexagon Pack 1.0 (Kay Lousberg) — bâtiments bleus/neutres, décor, tuiles | CC0 1.0 |
+| assets/surface/hexa | KayKit Medieval Hexagon Pack 1.0 (Kay Lousberg) — bâtiments bleus/verts/rouges/neutres, décor, tuiles | CC0 1.0 |
 | assets/surface/foret | KayKit Forest Nature Pack (version gratuite) | CC0 1.0 |
 | assets/surface/outils | KayKit RPG Tools Bits | CC0 1.0 |
 | assets/surface/ressources | KayKit Resource Bits | CC0 1.0 |
@@ -35,4 +35,4 @@ Chaque dossier garde le SOURCE.json (et la licence quand le pack en fournit une)
 
 ## Armes tenues en main
 
-- `assets/armes/` — staff, dagger, sword_1handed, shield_round et leurs textures, KayKit Character Pack : Adventurers 1.0 (Kay Lousberg, CC0 1.0), licence dans `assets/armes/LICENSE-KayKit.txt`.
+- `assets/armes/` — staff, dagger, sword_1handed, shield_round, axe_1handed, crossbow_1handed et leurs textures, KayKit Character Pack : Adventurers 1.0 (Kay Lousberg, CC0 1.0), licence dans `assets/armes/LICENSE-KayKit.txt`.
