@@ -4,6 +4,9 @@ extends EntiteCombat
 
 signal energie_change(e: float, e_max: float)
 signal refus(id: String, raison: String)
+signal mana_change(m: float, m_max: float)
+var mana := 100.0
+var mana_max := 100.0
 
 const MODELE := "res://assets/personnages/barbare.glb"
 const CACHES := ["1H_Axe_Offhand", "Barbarian_Round_Shield", "Mug", "1H_Axe"]
@@ -243,6 +246,13 @@ func _crit(chance: float) -> bool:
 		soigner(pv_max * 0.02)
 	return c
 
+## Les coups du joueur atteignent aussi la Horde (rampants sans corps physique).
+func _frappe_horde(d: Dictionary) -> void:
+	if ia or Essaim.moi == null:
+		return
+	d["source"] = self
+	Jeu.evenement("frappe", d)
+
 func _micro_pause(t: float) -> void:
 	if not ia:
 		Effets.micro_pause(get_tree(), t)
@@ -428,6 +438,7 @@ func _fendoir(d: Vector3) -> void:
 		return
 	Effets.taille(_scene(), global_position, d, 3.4, Color(1.0, 0.8, 0.45), "slash_02.png", 0.24, -0.9)
 	var touche := false
+	_frappe_horde({"centre": global_position, "rayon": 3.6, "angle": 0.95, "dir": d, "degats": 34.0 * degats_arme * (1.0 + stat("sorts"))})
 	for e in cibles_touchables():
 		if Zones.dans_cone(e.global_position, global_position, d, 3.6, 0.95, e.rayon):
 			e.recevoir({"montant": _degats(34.0, e), "source": self, "critique": _crit(0.15), "recul": 0.6})
@@ -464,6 +475,7 @@ func _souffle(d: Vector3) -> void:
 	for i in 3:
 		Effets.etincelles(_scene(), o, d + Vector3(0, 0.05, 0), Color(1.0, 0.55 - i * 0.12, 0.15), 22, 10.0 + i * 2.0, "fire_01.png" if i == 0 else "spark_04.png", 0.6 - i * 0.12)
 	Effets.flash_lumiere(_scene(), o + d * 2.0, Color(1.0, 0.5, 0.2), 4.0, 8.0, 0.35)
+	_frappe_horde({"centre": global_position, "rayon": 6.0, "angle": 1.1, "dir": d, "degats": 30.0 * degats_arme * (1.0 + stat("sorts")) * 1.6})
 	for e in cibles_touchables():
 		if Zones.dans_cone(e.global_position, global_position, d, 6.0, 1.1, e.rayon):
 			e.recevoir({"montant": _degats(30.0, e), "source": self, "critique": _crit(0.1)})
@@ -522,6 +534,7 @@ func _fin_envol() -> void:
 	Effets.etincelles(_scene(), global_position + Vector3(0, 0.3, 0), Vector3.UP, Color(1.0, 0.6, 0.2), 26, 7.0, "fire_01.png", 0.5)
 	Sons.jouer("atterrissage", global_position, 2.0, 0.8)
 	_camera_secousse(0.5)
+	_frappe_horde({"centre": global_position, "rayon": 3.8, "degats": 32.0 * degats_arme * (1.0 + stat("sorts")) * 1.4})
 	for e in cibles_touchables():
 		if Zones.dans_cercle(e.global_position, global_position, 3.6, e.rayon):
 			e.recevoir({"montant": _degats(32.0, e), "source": self, "critique": _crit(0.1), "recul": 1.6})
@@ -537,6 +550,7 @@ func _fin_bond() -> void:
 	Sons.jouer("atterrissage", global_position, 0.0)
 	_camera_secousse(0.4)
 	var touche := false
+	_frappe_horde({"centre": global_position, "rayon": 3.0, "degats": 26.0 * degats_arme * (1.0 + stat("sorts"))})
 	for e in cibles_touchables():
 		if Zones.dans_cercle(e.global_position, global_position, 2.6, e.rayon):
 			e.recevoir({"montant": _degats(26.0, e), "source": self, "critique": _crit(0.05), "ralentir": 1.5, "recul": 1.2})
@@ -760,6 +774,9 @@ func _physics_process(delta: float) -> void:
 		appliquer_physique(delta)
 		return
 	energie = minf(energie_max, energie + regen_energie * (1.0 + stat("energie")) * delta)
+	if mana < mana_max:
+		mana = minf(mana_max, mana + 2.5 * delta)
+		mana_change.emit(mana, mana_max)
 	_rempart_t = maxf(0.0, _rempart_t - delta)
 	if _carapace_t > 0.0:
 		_carapace_t -= delta
@@ -829,6 +846,7 @@ func _physics_process(delta: float) -> void:
 			if k2 >= 1.0:
 				action = ""
 				velocity = Vector3.ZERO
+				_frappe_horde({"centre": _action["dep"], "dir": _action["dir"], "longueur": _action["dist"] + 0.5, "rayon": 2.6, "degats": 78.0 * degats_arme})
 				Effets.poussiere(_scene(), global_position, 10)
 				if not _action["touches"].is_empty():
 					_camera_secousse(0.5)
@@ -876,6 +894,17 @@ func _physics_process(delta: float) -> void:
 	var cible_auto := ennemi_proche(3.0)
 	if cible_auto is Heros and (ZoneSure.contient(global_position) or ZoneSure.contient(cible_auto.global_position)):
 		cible_auto = null
+	if cible_auto == null and not ia and Essaim.moi and _attaque_t <= 0.0 and verrou_anim <= 0.0:
+		var pr := Essaim.moi.proche(global_position, 2.8)
+		if pr != Vector3.INF:
+			_attaque_t = 0.75
+			var da := direction_vers(pr)
+			if not bouge:
+				regarder(da)
+			jouer("2H_Melee_Attack_Slice", 0.06, 1.7, 0.35)
+			Sons.jouer("elan", global_position, -6.0, 1.15)
+			Effets.taille(_scene(), global_position, da, 2.8, Color(1.0, 0.72, 0.4, 0.8), "slash_03.png", 0.18, -0.5)
+			_frappe_horde({"centre": global_position, "rayon": 3.0, "angle": 1.2, "dir": da, "degats": 22.0 * degats_arme * (1.0 + stat("auto"))})
 	if cible_auto and _attaque_t <= 0.0 and verrou_anim <= 0.0:
 		_attaque_t = 0.95
 		var dir_a := direction_vers(cible_auto.global_position)

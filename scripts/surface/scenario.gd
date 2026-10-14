@@ -32,6 +32,10 @@ func demarrer(p: Node, h: Heros, hd: CanvasLayer, sans_intro := false) -> void:
 	p.add_child.call_deferred(guide)
 	_pnj_et_monstres()
 	_minicarte()
+	# la Horde des Terres Gâtées (le squelette est « cuit » pendant le chargement)
+	essaim = Essaim.new()
+	essaim.name = "Horde"
+	p.add_child.call_deferred(essaim)
 	if "--depart=bourg" in OS.get_cmdline_user_args():
 		# reprise de tournage : le joueur arrive à la porte du Bourg après le combat du chemin
 		etape = 3
@@ -121,17 +125,16 @@ func _minicarte() -> void:
 		{"type": "rect", "r": CarteSurface.BOURG, "couleur": Color(0.36, 0.29, 0.2)},
 		{"type": "cercle", "c": Vector2(CarteSurface.PLACE.x, CarteSurface.PLACE.z), "r": 14.0, "couleur": Color(0.48, 0.44, 0.38)},
 		{"type": "ligne", "pts": pts, "couleur": Color(0.78, 0.66, 0.46), "largeur": 3.0},
+		{"type": "rect", "r": CarteSurface.TERRES, "couleur": Color(0.28, 0.13, 0.1)},
+		{"type": "ligne", "pts": CarteSurface.ROUTE_TERRES, "couleur": Color(0.6, 0.45, 0.35), "largeur": 2.0},
 	]
 	mc.lieux = [
 		{"c": Vector2(CarteSurface.SANCTUAIRE.x, CarteSurface.SANCTUAIRE.z), "genre": "sanctuaire"},
 		{"c": Vector2(CarteSurface.PLACE.x, CarteSurface.PLACE.z), "genre": "sur"},
 		{"c": Vector2(CarteSurface.PORTAIL.x, CarteSurface.PORTAIL.z), "genre": "portail"},
 		{"c": Vector2(CarteSurface.CLAIRIERE.x, CarteSurface.CLAIRIERE.z), "genre": "danger"},
+		{"c": Vector2(151, 100), "genre": "elite"},
 	]
-	mc.touchee.connect(func():
-		guide.viser(CarteSurface.PLACE)
-		mc.cible = Vector2(CarteSurface.PLACE.x, CarteSurface.PLACE.z)
-		recit.voix("Guidage", "vers le Bourg de Skjold", 2.0))
 
 func _bloquer(b: bool) -> void:
 	heros.set_physics_process(not b)
@@ -172,6 +175,23 @@ func _intro() -> void:
 	etape = 1
 	_quete_bourg()
 
+var essaim: Essaim
+var _dans_terres := false
+
+func _terres(dans: bool) -> void:
+	if dans == _dans_terres or essaim == null:
+		return
+	_dans_terres = dans
+	if dans:
+		essaim.demarrer(heros, CarteSurface.TERRES, 260)
+		if not Profil.p().vu("terres_vues"):
+			Profil.p().marquer_vu("terres_vues")
+			recit.bandeau("Terres Gâtées", "La Horde se lève sans fin. Montre-leur ta puissance.", Color("#FF9C8A"))
+		else:
+			recit.bandeau("Terres Gâtées", "La Horde se lève", Color("#FF9C8A"))
+	else:
+		essaim.arreter()
+
 func _quete_bourg() -> void:
 	recit.quete("Rejoindre le Bourg de Skjold", "Suis la lumière dorée", CarteSurface.PORTE_BOURG)
 	guide.viser(CarteSurface.PORTE_BOURG)
@@ -181,6 +201,7 @@ func _process(_d: float) -> void:
 	if heros == null or not is_instance_valid(heros):
 		return
 	_lieux()
+	_terres(CarteSurface.TERRES.grow(2.0).has_point(Vector2(heros.global_position.x, heros.global_position.z)))
 	# le Portail se montre : la caméra s'ouvre vers lui quand on approche
 	var cam := get_viewport().get_camera_3d()
 	if cam and "point_interet" in cam:
@@ -266,6 +287,8 @@ func _lieux() -> void:
 		return
 	_lieu_actuel = id
 	match id:
+		"terres":
+			hud.regler_titre("Terres Gâtées", "La Horde ne s'arrête jamais", Color("#FF9C8A"))
 		"bourg":
 			recit.bandeau("Bourg de Skjold", "Zone sûre — les armes restent au fourreau", Color("#9DFFC8"))
 			hud.regler_titre("Bourg de Skjold", "Zone sûre", Color("#9DFFC8"))

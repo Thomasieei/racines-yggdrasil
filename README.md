@@ -41,6 +41,13 @@ Pas encore branché : vrai multijoueur en ligne.
 
 Le bébé dragon est le Dragon Evolved de Quaternius (CC0, animé) et l'œuf un modèle à écailles de la banque d'assets (CC0), tous deux recolorés selon la rareté.
 
+## Pouvoirs du monde (mana violet, boutons à droite)
+
+- **Téléportation** (30 mana) : touche la minicarte (ou M) pour ouvrir la grande carte, touche un endroit : ton héros incante puis y apparaît. « Y aller à pied » marque la destination.
+- **Lames de moisson** (35 mana, touche 7) : des scies runiques rasent jusqu'à 9 arbres, rochers ou filons autour de toi ; bois, pierre, minerais et expérience de Mineur d'un coup. Les arbres repoussent.
+- **Déchaînement** (70 mana, touche 8) : longue incantation, puis une explosion qui pulvérise tout dans un rayon de 18 m.
+- **Terres Gâtées** (au sud-est du Bourg, par la porte sud) : la Horde, des centaines de rampants qui déferlent sans fin. Chaque rampant pulvérisé rend un peu de mana : on enchaîne les Déchaînements.
+
 ## Commandes
 
 | Tactile | Clavier / souris |

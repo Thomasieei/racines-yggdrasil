@@ -134,3 +134,17 @@ D["oeuf_runique"] = forme("M64 8 Q104 40 104 78 A40 40 0 0 1 24 78 Q24 40 64 8 Z
 for k, v in D.items():
     open(os.path.join(RACINE, "icones_sorts", k + ".svg"), "w").write(svg2(v))
 print(len(D), "icônes draconiques")
+
+# ---- pouvoirs du monde ----
+P = {}
+P["pouvoir_tp"] = forme("M64 12 A52 52 0 1 1 63.9 12 Z", "url(#nuit)") + \
+    trait("M64 30 A30 30 0 1 1 40 46 M64 44 A16 16 0 1 0 80 58", "url(#givre)", 7) + \
+    forme("M64 56 A8 8 0 1 1 63.9 56 Z", "#F2FCFF", 3)
+dents = "".join(f'<path d="M64 10 L72 24 L56 24 Z" transform="rotate({a} 64 64)" fill="url(#or)" stroke="{N}" stroke-width="4" stroke-linejoin="round"/>' for a in range(0, 360, 36))
+P["pouvoir_lames"] = dents + forme("M64 22 A42 42 0 1 1 63.9 22 Z", "url(#or)") + forme("M64 48 A16 16 0 1 1 63.9 48 Z", "url(#bois)", 4) + \
+    trait("M64 30 L64 40 M64 88 L64 98 M30 64 L40 64 M88 64 L98 64", "#FFF8E2", 4)
+rayons = "".join(f'<path d="M64 6 L70 40 L58 40 Z" transform="rotate({a} 64 64)" fill="url(#feu)" stroke="{N}" stroke-width="4" stroke-linejoin="round"/>' for a in range(0, 360, 30))
+P["pouvoir_dechainement"] = rayons + forme("M64 34 A30 30 0 1 1 63.9 34 Z", "url(#feu)") + forme("M64 50 A14 14 0 1 1 63.9 50 Z", "#FFF1C4", 4)
+for k, v in P.items():
+    open(os.path.join(RACINE, "icones_sorts", k + ".svg"), "w").write(svg2(v))
+print(len(P), "pouvoirs")

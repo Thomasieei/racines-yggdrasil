@@ -17,6 +17,9 @@ const LISTE := [
 	{"id": "elite_3", "cat": "Chasse", "nom": "Régicide", "texte": "Vaincre les trois élites différents.", "compteur": "elites_diff", "but": 3, "pts": 3},
 	{"id": "ymir", "cat": "Chasse", "nom": "Le roi est mort", "texte": "Participer à la chute d'Ymir.", "compteur": "boss", "but": 1, "pts": 5},
 	{"id": "duel", "cat": "Chasse", "nom": "Loi du plus fort", "texte": "Vaincre un autre aventurier dans le donjon.", "compteur": "jcj", "but": 1, "pts": 2},
+	{"id": "horde_100", "cat": "Chasse", "nom": "Faucheur", "texte": "Pulvériser 100 rampants de la Horde.", "compteur": "horde", "but": 100, "pts": 1},
+	{"id": "horde_1000", "cat": "Chasse", "nom": "Fléau de la Horde", "texte": "Pulvériser 1 000 rampants de la Horde.", "compteur": "horde", "but": 1000, "pts": 3},
+	{"id": "horde_10000", "cat": "Chasse", "nom": "Cataclysme", "texte": "Pulvériser 10 000 rampants de la Horde.", "compteur": "horde", "but": 10000, "pts": 5},
 	# Exploration
 	{"id": "extraction_1", "cat": "Exploration", "nom": "Revenu vivant", "texte": "Remonter du donjon par une racine de retour.", "compteur": "extractions", "but": 1, "pts": 2},
 	{"id": "extraction_10", "cat": "Exploration", "nom": "Pilleur aguerri", "texte": "Réussir 10 extractions.", "compteur": "extractions", "but": 10, "pts": 3},

@@ -20,6 +20,8 @@ const MODELES := {
 	"minerai_argent": {"nom": "Minerai d'argent", "type": "ressource", "icone": ICO2 + "minerai_argent.png", "valeur": 14, "pile": 99},
 	"minerai_or": {"nom": "Minerai d'or", "type": "ressource", "icone": ICO2 + "minerai_or.png", "valeur": 30, "pile": 99},
 	"lingot_or": {"nom": "Lingots d'or nain", "type": "ressource", "icone": ICO2 + "lingots_or.png", "valeur": 120, "pile": 20},
+	"bois": {"nom": "Bois de frêne", "type": "ressource", "icone": ICO2 + "bois.png", "valeur": 3, "pile": 99},
+	"pierre": {"nom": "Pierre taillée", "type": "ressource", "icone": ICO2 + "pierre.png", "valeur": 2, "pile": 99},
 	"tissu": {"nom": "Étoffe de draugr", "type": "ressource", "icone": ICO2 + "tissu.png", "valeur": 3, "pile": 99},
 	"potion": {"nom": "Potion de soin", "type": "potion", "icone": "res://assets/icones_sorts/potion.svg", "valeur": 25, "pile": 10},
 	"hache": {"nom": "Hache", "type": "arme", "icone": ICO + "000_axe_1handed.png", "valeur": 40},

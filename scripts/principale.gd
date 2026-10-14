@@ -50,6 +50,8 @@ func _ready() -> void:
 	chargement.disparaitre()
 	if carte == "surface" and not extraction.is_empty():
 		_accueil_extraction()
+	if "--test-pouvoirs" in OS.get_cmdline_user_args():
+		_test_pouvoirs()
 	if "--test-boucle" in OS.get_cmdline_user_args():
 		_test_boucle()
 	if "--test-progression" in OS.get_cmdline_user_args():
@@ -169,6 +171,13 @@ func _construire() -> void:
 		sc.demarrer(self, joueur, hud, "--sans-intro" in args or sans_intro_suivante)
 	if carte == "epreuve":
 		monde.demarrer(self, joueur, hud)
+	if hud and hud.has_method("construire_pouvoirs"):
+		var pv := Pouvoirs.new()
+		pv.name = "Pouvoirs"
+		pv.h = joueur
+		pv.principale = self
+		add_child(pv)
+		hud.construire_pouvoirs()
 	if hud:
 		var suivi := Node.new()
 		suivi.set_script(load("res://scripts/progression/suivi.gd"))
@@ -575,6 +584,52 @@ func _test_boucle() -> void:
 		await _cap("forge")
 		printerr("TEST coffre=", Profil.p().coffre["objets"].size(), " sac=", joueur.sac.objets.size(), " or=", joueur.sac.or_)
 		get_tree().quit()
+
+func _test_pouvoirs() -> void:
+	await get_tree().create_timer(1.5).timeout
+	joueur.invulnerable_t = 1e9
+	joueur.mana_max = 500.0
+	joueur.mana = 500.0
+	var pv: Pouvoirs = Pouvoirs.moi
+	pv.ouvrir_carte()
+	await get_tree().create_timer(0.6).timeout
+	for c in get_children():
+		if c.has_method("_vers_monde"):
+			c._cible = Vector2(151, 100)
+			c._boutons()
+	await get_tree().create_timer(0.3).timeout
+	await _cap("carte")
+	for c in get_children():
+		if c.has_method("_vers_monde"):
+			c.fermer()
+	pv.teleporter(Vector3(151, 0, 100))
+	await get_tree().create_timer(1.0).timeout
+	await _cap("tp_incante")
+	await get_tree().create_timer(6.0).timeout
+	await _cap("horde")
+	var somme := 0.0
+	for f in 60:
+		await get_tree().process_frame
+		somme += Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+	printerr("TEST horde vivants=", Essaim.moi._n, " ms_process moyen=", snappedf(somme / 60.0, 0.01))
+	pv.lancer("dechainement")
+	await get_tree().create_timer(2.75).timeout
+	await _cap("dechainement")
+	await get_tree().create_timer(1.0).timeout
+	printerr("TEST horde tués=", Essaim.moi.tues, " vivants=", Essaim.moi._n)
+	await get_tree().create_timer(3.0).timeout
+	await _cap("horde_retour")
+	# moisson près de la forêt
+	joueur.global_position = Vector3(74, 0.1, 54)
+	await get_tree().create_timer(1.5).timeout
+	printerr("TEST cibles moisson=", pv._cibles_recolte(16.0, 9).size())
+	pv.lancer("lames")
+	await get_tree().create_timer(1.8).timeout
+	await _cap("lames")
+	await get_tree().create_timer(1.6).timeout
+	await _cap("lames_fin")
+	printerr("TEST sac=", joueur.sac.objets.map(func(o): return o["nom"] + "x" + str(o["qte"])))
+	get_tree().quit()
 
 func _cap(nom: String) -> void:
 	if DisplayServer.get_name() == "headless":

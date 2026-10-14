@@ -43,6 +43,10 @@ var _mort_ecran: Control
 
 const LARG_VIE := 270.0
 const LARG_ENERGIE := 210.0
+const LARG_MANA := 96.0
+var _mana_plein: ColorRect
+var _mana_texte: Label
+var _boutons_pouvoir := {}
 
 var _titre: Label
 var _sous_titre: Label
@@ -71,6 +75,10 @@ func brancher(h: Heros) -> void:
 	add_child(codex_ui)
 	codex_ui.brancher(h)
 	heros.ramasse.connect(_sur_ramasse)
+	heros.mana_change.connect(_sur_mana)
+	_sur_mana(heros.mana, heros.mana_max)
+	if minicarte:
+		minicarte.touchee.connect(func(): if Pouvoirs.moi: Pouvoirs.moi.ouvrir_carte())
 	_construire_boutons_monde()
 
 func _ready() -> void:
@@ -158,6 +166,16 @@ func _haut_gauche() -> void:
 	var pe := Vector2(100, 48)
 	_fond_barre(pe, Vector2(LARG_ENERGIE, 16), Color(0.04, 0.07, 0.14, 0.85))
 	_energie_plein = neuf(UI + "aventure/progress_blue_border.png", 8, Vector2(LARG_ENERGIE, 16), pe)
+	# mana : violet, juste à droite de l'énergie
+	var pm := Vector2(316, 48)
+	_fond_barre(pm, Vector2(LARG_MANA, 16), Color(0.1, 0.04, 0.14, 0.85))
+	_mana_plein = ColorRect.new()
+	_mana_plein.color = Color("#A45CFF")
+	_mana_plein.position = pm + Vector2(3, 3)
+	_mana_plein.size = Vector2(LARG_MANA - 6, 10)
+	_mana_plein.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	racine.add_child(_mana_plein)
+	_mana_texte = texte("", 11, Color("#F3E6FF"), pm + Vector2(0, 0), null, true, LARG_MANA, HORIZONTAL_ALIGNMENT_CENTER)
 	var cl: Dictionary = Classes.fiche(Profil.p().classe)
 	texte("Thomas · " + cl["titre"], 15, cl["couleur"].lerp(OR, 0.3), Vector2(102, 68))
 
@@ -179,6 +197,27 @@ func _sur_pv(pv: float, pv_max: float) -> void:
 	_vie_plein.size.x = maxf(24.0, LARG_VIE * k)
 	_vie_plein.visible = k > 0.0
 	_vie_texte.text = _milliers(int(ceil(pv))) + " / " + _milliers(int(pv_max))
+
+func _sur_mana(m: float, m_max: float) -> void:
+	if _mana_plein:
+		_mana_plein.size.x = maxf(0.0, (LARG_MANA - 6) * clampf(m / m_max, 0.0, 1.0))
+		_mana_texte.text = "%d mana" % int(m)
+	for id in _boutons_pouvoir:
+		var b: Control = _boutons_pouvoir[id]
+		b.modulate = Color.WHITE if m >= Pouvoirs.LISTE[id]["mana"] else Color(0.55, 0.55, 0.62)
+
+## Les trois pouvoirs du monde, en colonne à droite (au-dessus de la roue des sorts).
+func construire_pouvoirs() -> void:
+	var y := 214.0
+	for id in ["tp", "lames", "dechainement"]:
+		var b := _rond(Vector2(1238, y), 58, Pouvoirs.LISTE[id]["icone"])
+		var lab := texte("%d" % int(Pouvoirs.LISTE[id]["mana"]), 11, Color("#E6D2FF"), Vector2(36, 40), b, true)
+		b.gui_input.connect(func(ev):
+			if (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and ev.pressed):
+				if Pouvoirs.moi and not Jeu.interface_bloquante:
+					Pouvoirs.moi.lancer(id))
+		_boutons_pouvoir[id] = b
+		y += 64.0
 
 func _sur_energie(e: float, e_max: float) -> void:
 	_energie_plein.size.x = maxf(16.0, LARG_ENERGIE * clampf(e / e_max, 0.0, 1.0))
@@ -418,6 +457,12 @@ func _input(event: InputEvent) -> void:
 			talents_ui.basculer()
 		elif event.keycode == KEY_C:
 			codex_ui.basculer()
+		elif event.keycode == KEY_M and Pouvoirs.moi:
+			Pouvoirs.moi.ouvrir_carte()
+		elif event.keycode == KEY_7 and Pouvoirs.moi:
+			Pouvoirs.moi.lancer("lames")
+		elif event.keycode == KEY_8 and Pouvoirs.moi:
+			Pouvoirs.moi.lancer("dechainement")
 		elif event.keycode == KEY_E:
 			_agir()
 
@@ -503,6 +548,38 @@ func regler_minuteur(t: String, couleur: Color) -> void:
 		_minuteur = texte("", 14, couleur, Vector2(1116, 160), null, true, 150, HORIZONTAL_ALIGNMENT_CENTER)
 	_minuteur.text = t
 	_minuteur.add_theme_color_override("font_color", couleur)
+
+# ---------- compteur de la Horde ----------
+
+var _combo: Control
+var _combo_lab: Label
+var _combo_sous: Label
+var _combo_t := 0.0
+var _combo_n := 0
+
+func combo_horde(morts: int, total: int) -> void:
+	if _combo == null:
+		_combo = Control.new()
+		_combo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		racine.add_child(_combo)
+		_combo_lab = texte("", 40, Color("#FFD34E"), Vector2(0, 92), _combo, true, 1280, HORIZONTAL_ALIGNMENT_CENTER)
+		_combo_sous = texte("", 14, Color("#FFE2C0"), Vector2(0, 142), _combo, true, 1280, HORIZONTAL_ALIGNMENT_CENTER)
+	if _combo_t <= 0.0:
+		_combo_n = 0
+	_combo_n += morts
+	_combo_t = 2.5
+	_combo.modulate.a = 1.0
+	_combo_lab.text = "× %d" % _combo_n
+	_combo_sous.text = "pulvérisés  ·  %s depuis ton arrivée" % _milliers(total)
+	_combo_lab.pivot_offset = Vector2(640, 24)
+	_combo_lab.scale = Vector2.ONE * (1.0 + minf(morts, 30) * 0.02)
+	create_tween().tween_property(_combo_lab, "scale", Vector2.ONE, 0.2)
+
+func _maj_combo(delta: float) -> void:
+	if _combo == null or _combo_t <= 0.0:
+		return
+	_combo_t -= delta
+	_combo.modulate.a = clampf(_combo_t / 0.6, 0.0, 1.0)
 
 # ---------- canal du donjon ----------
 
@@ -649,6 +726,7 @@ func _process(delta: float) -> void:
 		_chercher_action()
 		_maj_notes(delta)
 		_maj_canal(delta)
+		_maj_combo(delta)
 	if heros == null:
 		return
 	# traînée de vie

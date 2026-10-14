@@ -24,6 +24,9 @@ const BOURG := Rect2(104, 16, 46, 42)
 const PLACE := Vector3(127, 0, 37)
 const PORTAIL := Vector3(127, 0, -5)
 const PORTE_BOURG := Vector3(104, 0, 48)
+## Terres Gâtées : au sud-est du Bourg, une lande morte où la Horde se lève sans fin.
+const TERRES := Rect2(134, 76, 34, 48)
+const ROUTE_TERRES := [Vector2(127.5, 57), Vector2(129, 66), Vector2(139, 78)]
 
 ## Lieux nommés (bandeaux d'entrée de zone, minicarte, guidage)
 const LIEUX := [
@@ -31,6 +34,7 @@ const LIEUX := [
 	{"id": "clairiere", "nom": "Clairière des Tertres", "centre": Vector3(62, 0, 69), "rayon": 13.0},
 	{"id": "bourg", "nom": "Bourg de Skjold", "centre": Vector3(127, 0, 37), "rayon": 27.0, "sur": true},
 	{"id": "portail", "nom": "Portail d'Yggdrasil", "centre": Vector3(127, 0, 0), "rayon": 13.0},
+	{"id": "terres", "nom": "Terres Gâtées", "centre": Vector3(151, 0, 100), "rayon": 24.0},
 	{"id": "bois", "nom": "Bois des Murmures", "centre": Vector3(80, 0, 70), "rayon": 999.0},
 ]
 
@@ -54,6 +58,7 @@ var _decor: Node3D
 var _colliders: Node3D
 
 func _ready() -> void:
+	courante = self
 	_rng.seed = 7741
 	_decor = Node3D.new()
 	_decor.name = "Decor"
@@ -72,6 +77,7 @@ func _ready() -> void:
 	_lanternes_du_chemin()
 	_foret()
 	_herbes()
+	_terres_gatees()
 
 # =================== briques ===================
 
@@ -129,7 +135,7 @@ func _boite_collision(centre: Vector3, taille: Vector3, rot_y := 0.0) -> void:
 	corps.position = centre
 	corps.rotation.y = rot_y
 
-func _cylindre_collision(pos: Vector3, rayon: float, hauteur: float) -> void:
+func _cylindre_collision(pos: Vector3, rayon: float, hauteur: float) -> StaticBody3D:
 	var corps := StaticBody3D.new()
 	var f := CollisionShape3D.new()
 	var c := CylinderShape3D.new()
@@ -140,6 +146,7 @@ func _cylindre_collision(pos: Vector3, rayon: float, hauteur: float) -> void:
 	corps.add_child(f)
 	_colliders.add_child(corps)
 	corps.position = pos
+	return corps
 
 func lumiere(pos: Vector3, couleur: Color, energie: float, portee: float, parent: Node = null) -> OmniLight3D:
 	var l := OmniLight3D.new()
@@ -178,7 +185,7 @@ func _maillage(chemin: String) -> Array:
 	n.free()
 	return res
 
-func _multimesh(chemin: String, transforms: Array, ombres := true) -> void:
+func _multimesh(chemin: String, transforms: Array, ombres := true, recolte := "") -> void:
 	if transforms.is_empty():
 		return
 	var m := _maillage(chemin)
@@ -192,10 +199,20 @@ func _multimesh(chemin: String, transforms: Array, ombres := true) -> void:
 			cases[cle] = []
 		cases[cle].append(xf)
 	for cle in cases:
-		_multimesh_lot(m, cases[cle], ombres)
+		var mm := _multimesh_lot(m, cases[cle], ombres)
+		if recolte == "":
+			continue
+		# arbres et rochers moissonnables (Lames de moisson) : on garde leur place dans le multimesh
+		var xfs: Array = cases[cle]
+		for i in xfs.size():
+			var o: Vector3 = xfs[i].origin
+			if not LIMITES.has_point(Vector2(o.x, o.z)):
+				continue
+			recoltables.append({"genre": recolte, "pos": o, "mm": mm, "i": i, "xf": xfs[i] * m[1], "chemin": chemin,
+				"corps": _troncs.get(Vector2i(roundi(o.x * 10.0), roundi(o.z * 10.0))), "abattu": false})
 	return
 
-func _multimesh_lot(m: Array, transforms: Array, ombres: bool) -> void:
+func _multimesh_lot(m: Array, transforms: Array, ombres: bool) -> MultiMesh:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.mesh = m[0]
@@ -206,6 +223,140 @@ func _multimesh_lot(m: Array, transforms: Array, ombres: bool) -> void:
 	mmi.multimesh = mm
 	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if ombres else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_decor.add_child(mmi)
+	return mm
+
+# =================== Terres Gâtées ===================
+
+static func _dist_route(p: Vector2) -> float:
+	var m := 1e9
+	for i in ROUTE_TERRES.size() - 1:
+		var a: Vector2 = ROUTE_TERRES[i]
+		var b: Vector2 = ROUTE_TERRES[i + 1]
+		var ab := b - a
+		var t := clampf((p - a).dot(ab) / ab.length_squared(), 0.0, 1.0)
+		m = minf(m, p.distance_to(a + ab * t))
+	return m
+
+func _terres_gatees() -> void:
+	var r := TERRES
+	# sol brûlé, cendre et braises (le reste du monde est vert : on la repère de loin)
+	var sol := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = r.size + Vector2(10, 10)
+	sol.mesh = pm
+	var sh := Shader.new()
+	sh.code = """
+shader_type spatial;
+varying vec3 pm;
+float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float b(vec2 p) { vec2 i = floor(p); vec2 f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
+	return mix(mix(h(i), h(i + vec2(1, 0)), u.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), u.x), u.y); }
+void vertex() { pm = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
+void fragment() {
+	vec2 uvc = UV * 2.0 - 1.0;
+	float bord = smoothstep(1.0, 0.82, max(abs(uvc.x), abs(uvc.y)));
+	float n = b(pm.xz * 0.35) * 0.6 + b(pm.xz * 1.3) * 0.4;
+	vec3 c = mix(vec3(0.16, 0.12, 0.1), vec3(0.3, 0.24, 0.2), n);
+	float braise = smoothstep(0.78, 0.86, b(pm.xz * 0.9 + vec2(TIME * 0.05, 0.0)));
+	ALBEDO = c;
+	ROUGHNESS = 0.95;
+	EMISSION = vec3(1.0, 0.35, 0.1) * braise * 0.9 * (0.7 + 0.3 * sin(TIME * 2.0 + pm.x));
+	ALPHA = bord;
+}
+"""
+	var mat := ShaderMaterial.new()
+	mat.shader = sh
+	mat.render_priority = 1
+	sol.material_override = mat
+	sol.transparency = 0.0
+	sol.position = Vector3(r.get_center().x, 0.03, r.get_center().y)
+	_decor.add_child(sol)
+	# chemin de terre depuis la porte sud du Bourg
+	for i in ROUTE_TERRES.size() - 1:
+		var a: Vector2 = ROUTE_TERRES[i]
+		var b: Vector2 = ROUTE_TERRES[i + 1]
+		var n := int(a.distance_to(b) / 2.6)
+		for k in n + 1:
+			var q := a.lerp(b, float(k) / maxf(n, 1))
+			poser(HW + "floor_dirt_small.gltf", Vector3(q.x, 0.02, q.y), _rng.randf_range(0, 360), 1.5)
+	# tombes et os éparpillés, arbres morts en lisière, deux braseros
+	var morts: Array = []
+	for i in 34:
+		var t := float(i) / 34.0
+		var p := Vector2.ZERO
+		match i % 4:
+			0: p = Vector2(lerpf(r.position.x, r.end.x, t), r.position.y - 2.0)
+			1: p = Vector2(lerpf(r.position.x, r.end.x, t), r.end.y + 2.0)
+			2: p = Vector2(r.position.x - 2.0, lerpf(r.position.y, r.end.y, t))
+			3: p = Vector2(r.end.x + 2.0, lerpf(r.position.y, r.end.y, t))
+		if _dist_route(p) < 6.0 or not LIMITES.grow(6).has_point(p):
+			continue
+		poser(HW + ["tree_dead_large", "tree_dead_medium", "tree_dead_small"][i % 3] + ".gltf", Vector3(p.x, 0, p.y), _rng.randf_range(0, 360), _rng.randf_range(1.6, 2.4))
+	for i in 26:
+		var p2 := Vector3(_rng.randf_range(r.position.x + 2, r.end.x - 2), 0, _rng.randf_range(r.position.y + 2, r.end.y - 2))
+		var nom: String = ["grave_A", "grave_A_destroyed", "gravestone", "gravemarker_A", "bone_A", "bone_B", "ribcage", "skull"][i % 8]
+		poser(HW + nom + ".gltf", p2, _rng.randf_range(0, 360), 1.6 if nom.begins_with("grave") else 1.2)
+	for p3 in [Vector3(r.position.x + 3, 0, r.position.y + 3), Vector3(r.end.x - 3, 0, r.end.y - 3), Vector3(r.position.x + 3, 0, r.end.y - 3)]:
+		poser(HW + "post_skull.gltf", p3, 0.0, 1.4)
+		_feu(p3 + Vector3(0, 2.2, 0), 0.4)
+		lumiere(p3 + Vector3(0, 2.6, 0), Color(1.0, 0.45, 0.2), 2.0, 12.0)
+	poser(HW + "arch_gate.gltf", Vector3(139.5, 0, 77.5), 35.0, 1.8)
+	lumiere(Vector3(151, 6, 100), Color(1.0, 0.4, 0.25), 1.2, 30.0)
+
+# =================== moisson (pouvoir « Lames de moisson ») ===================
+
+static var courante: CarteSurface
+var recoltables: Array = []
+var _troncs := {}
+const REPOUSSE := 240.0
+
+func cibles_recolte(p: Vector3, rayon: float, n: int) -> Array:
+	var l: Array = []
+	for r in recoltables:
+		if not r["abattu"] and Vector2(r["pos"].x - p.x, r["pos"].z - p.z).length() < rayon:
+			l.append(r)
+	l.sort_custom(func(a, b): return a["pos"].distance_squared_to(p) < b["pos"].distance_squared_to(p))
+	return l.slice(0, n)
+
+## L'arbre (ou le rocher) disparaît du multimesh ; un vrai modèle tombe à sa place, puis il repousse.
+func abattre(r: Dictionary) -> void:
+	if r["abattu"]:
+		return
+	r["abattu"] = true
+	var mm: MultiMesh = r["mm"]
+	mm.set_instance_transform(r["i"], Transform3D().scaled(Vector3(0.001, 0.001, 0.001)))
+	var corps = r["corps"]
+	if corps and is_instance_valid(corps):
+		corps.collision_layer = 0
+	var vrai: Node3D = _scene(r["chemin"]).instantiate()
+	teinter(vrai, TEINTE_BOIS_MORT if r["chemin"].contains("Bare") else TEINTE_FORET)
+	vrai.transform = r["xf"]
+	_decor.add_child(vrai)
+	var tw := vrai.create_tween()
+	if r["genre"] == "arbre":
+		var axe := Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized()
+		var base: Basis = vrai.transform.basis
+		tw.tween_method(func(k: float): vrai.transform.basis = Basis(axe, k * 1.45) * base, 0.0, 1.0, 0.9).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+		tw.tween_callback(func(): Effets.poussiere(self, r["pos"] + axe.cross(Vector3.UP) * 3.0, 14, Color(0.55, 0.5, 0.35, 0.7)))
+		tw.tween_property(vrai, "position:y", -2.5, 1.2).set_delay(0.6)
+	else:
+		Effets.poussiere(self, r["pos"], 12, Color(0.6, 0.6, 0.62, 0.7))
+		tw.tween_property(vrai, "scale", Vector3.ZERO, 0.35)
+	tw.tween_callback(vrai.queue_free)
+	get_tree().create_timer(REPOUSSE).timeout.connect(func(): _repousser(r))
+
+func _repousser(r: Dictionary) -> void:
+	if not is_instance_valid(self):
+		return
+	var mm: MultiMesh = r["mm"]
+	var xf: Transform3D = r["xf"]
+	var tw := create_tween()
+	tw.tween_method(func(k: float): mm.set_instance_transform(r["i"], Transform3D(xf.basis.scaled(Vector3.ONE * maxf(k, 0.001)), xf.origin)), 0.0, 1.0, 2.0).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	tw.tween_callback(func():
+		r["abattu"] = false
+		var corps = r["corps"]
+		if corps and is_instance_valid(corps):
+			corps.collision_layer = 1)
 
 static func distance_chemin(p: Vector2) -> Array:
 	var meilleur := 1e9
@@ -327,7 +478,7 @@ func _bourg() -> void:
 	# ouest, sud, est : palissade basse en bois (on voit par-dessus)
 	_palissade(Vector3(r.position.x, 0, r.position.y + 2), Vector3(r.position.x, 0, r.end.y), [Vector2(44.0, 52.5)])
 	_palissade(Vector3(r.end.x, 0, r.position.y + 2), Vector3(r.end.x, 0, r.end.y), [])
-	_palissade(Vector3(r.position.x, 0, r.end.y), Vector3(r.end.x, 0, r.end.y), [])
+	_palissade(Vector3(r.position.x, 0, r.end.y), Vector3(r.end.x, 0, r.end.y), [Vector2(123.5, 131.5)])
 	# tours : coins nord et porte principale (repères visibles de loin)
 	for t in [Vector3(r.position.x, 0, r.position.y), Vector3(r.end.x, 0, r.position.y)]:
 		poser(B + "building_tower_A_blue.gltf", t, 0.0, 5.0, "boite")
@@ -559,6 +710,8 @@ func _libre(p: Vector2, marge := 0.0) -> bool:
 		return false
 	if Rect2(BOURG.position - Vector2(7, 7), BOURG.size + Vector2(14, 14)).has_point(p):
 		return false
+	if TERRES.grow(5.0 + marge).has_point(p) or _dist_route(p) < 5.0 + marge:
+		return false
 	for z in [[SANCTUAIRE, 13.0], [CLAIRIERE, 14.0], [PORTAIL + Vector3(0, 0, 3), 17.0]]:
 		if p.distance_to(Vector2(z[0].x, z[0].z)) < z[1] + marge:
 			return false
@@ -593,11 +746,11 @@ func _foret() -> void:
 				par_type[types[_rng.randi() % types.size()]].append(xf)
 			# troncs solides seulement là où l'on peut marcher
 			if LIMITES.has_point(p) and dc < 30.0:
-				_cylindre_collision(Vector3(p.x, 0, p.y), 0.6, 4.0)
+				_troncs[Vector2i(roundi(p.x * 10.0), roundi(p.y * 10.0))] = _cylindre_collision(Vector3(p.x, 0, p.y), 0.6, 4.0)
 		x += pas
 	for t in types:
-		_multimesh(F + t + "_Color1.gltf", par_type[t])
-	_multimesh(F + "Tree_Bare_1_A_Color1.gltf", morts)
+		_multimesh(F + t + "_Color1.gltf", par_type[t], true, "arbre")
+	_multimesh(F + "Tree_Bare_1_A_Color1.gltf", morts, true, "arbre")
 
 func _herbes() -> void:
 	var touffes := {"Grass_1_A": [], "Grass_2_B": [], "Grass_1_C": []}
@@ -615,6 +768,8 @@ func _herbes() -> void:
 			continue
 		if p.distance_to(Vector2(PORTAIL.x, PORTAIL.z + 4.0)) < 12.0:
 			continue
+		if TERRES.grow(3.0).has_point(p) or _dist_route(p) < 3.0:
+			continue
 		var base := Transform3D(Basis(Vector3.UP, _rng.randf_range(0, TAU)), Vector3(p.x, 0, p.y))
 		var r := _rng.randf()
 		# herbe surtout le long du chemin : c'est là que le joueur regarde
@@ -630,4 +785,4 @@ func _herbes() -> void:
 	for k in buissons:
 		_multimesh(F + k + "_Color1.gltf", buissons[k], false)
 	for k in rochers:
-		_multimesh(F + k + "_Color1.gltf", rochers[k], false)
+		_multimesh(F + k + "_Color1.gltf", rochers[k], false, "rocher")

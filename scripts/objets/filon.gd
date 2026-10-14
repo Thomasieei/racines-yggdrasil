@@ -102,6 +102,23 @@ func interagir(h: Heros) -> void:
 	if charges <= 0:
 		_epuiser()
 
+## Récolte par les Lames de moisson : toutes les charges d'un coup, même niveau de métier ignoré.
+func recolter_magie(h: Heros) -> void:
+	if charges <= 0:
+		return
+	var d: Dictionary = TYPES[type]
+	var qte: int = (randi_range(2, 3) + h.metier_mine["niveau"] / 4) * charges
+	charges = 0
+	var gains: Array = [Objets.creer(d["minerai"], "commun", qte)]
+	if randf() < 0.1:
+		gains.append(Objets.creer("lingot_or", "commun", 1))
+	h.ramasser({"or": 0, "objets": gains}, d["nom"])
+	h.gagner_xp_mine(d["xp"] * 2)
+	if h == Jeu.joueur:
+		Jeu.evenement("mine", {"minerai": d["minerai"], "qte": qte})
+	Effets.etincelles(get_parent(), global_position + Vector3(0, 1.0, 0), Vector3.UP, d["couleur"], 30, 6.0, "spark_04.png", 0.35)
+	_epuiser()
+
 ## Petits chocs de pioche pendant la canalisation (étincelles + son), tant qu'on n'est pas interrompu.
 func _coups(h: Heros) -> void:
 	for i in 3:

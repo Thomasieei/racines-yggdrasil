@@ -40,7 +40,7 @@ func _ready() -> void:
 		["minerai_cuivre", R + "Copper_Nuggets.gltf", 1.0], ["minerai_fer", R + "Iron_Nuggets.gltf", 1.0],
 		["minerai_argent", R + "Silver_Nuggets.gltf", 1.0], ["minerai_or", R + "Gold_Nuggets.gltf", 1.0],
 		["lingots_or", R + "Gold_Bars.gltf", 1.0], ["pieces_or", DJ + "coin_stack_medium.glb", 1.0],
-		["pierre", R + "Stone_Chunks_Small.gltf", 1.0], ["tissu", R + "Textiles_A.gltf", 1.0],
+		["pierre", R + "Stone_Chunks_Small.gltf", 1.0], ["tissu", R + "Textiles_A.gltf", 1.0], ["bois", R + "Wood_Log_A.gltf", 1.0],
 	]
 	for e in liste:
 		var n: Node3D = load(e[1]).instantiate()
