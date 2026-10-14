@@ -58,6 +58,8 @@ func demarrer(p: Node) -> void:
 	for col in carte.bourgs.colonies:
 		if col.faction == "hostile":
 			pillards.append_array(Pillards.peupler(p, col))
+			if Pillards.conquis(col.id):
+				_portes(col)
 			continue
 		colonies.append(col)
 		if col.id == "brekka":
@@ -66,6 +68,8 @@ func demarrer(p: Node) -> void:
 		_peupler(col)
 		_gardes(col)
 		_portes(col)
+	for s in Profil.p().vus.get("serviteurs", []):
+		ajouter_serviteur(s)
 	reassigner()
 	Hameau.avancer()
 	_annoncer_grenier()
@@ -193,13 +197,24 @@ func _gardes(col: Colonie) -> void:
 
 func _portes(col: Colonie) -> void:
 	for m in col.maisons:
-		if m["genre"] in ["maison", "taverne", "forge", "marche", "chateau", "temple"]:
+		if m["genre"] in ["maison", "taverne", "forge", "marche", "chateau", "temple", "hall"]:
 			var porte := PorteMaison.new()
 			porte.maison = m
 			porte.colonie = col
 			porte.position = m["porte"]
 			principale.add_child(porte)
 			portes.append(porte)
+
+## Un serviteur de ta maison (Brekka) : un habitant qui t'obéit comme un pantin, sans mana.
+func ajouter_serviteur(s: Dictionary) -> Villageois:
+	if brekka == null or brekka.maisons.is_empty():
+		return null
+	var v := _nouveau(brekka, s["nom"], "Serviteur", "passant", s["modele"], false, s["femme"], brekka.maisons[0])
+	v.teinte = Color(s["teinte"])
+	v.set_meta("serviteur", true)
+	if Pantins.moi:
+		Pantins.moi.ajouter(v, true)
+	return v
 
 ## Marchands et forgerons des villes : on peut leur parler (achat, vente, forge).
 func _commerce(v: Villageois, role: String) -> void:

@@ -4,13 +4,18 @@ extends RefCounted
 ## et le lac sont bloquants ; les routes et les pavés coûtent moins cher : les gens les suivent.
 
 static var grille: AStarGrid2D
+static var caverne: NavCaverne        ## dans le donjon, les compagnons suivent la grille de la caverne
 static var _taille := Vector2i.ZERO
 static var _image_frame := -1
 static var _calculs := 0
 const CALCULS_PAR_IMAGE := 3
 
 static func pret() -> bool:
-	return grille != null
+	return grille != null or (caverne != null and caverne.pret)
+
+static func oublier() -> void:
+	grille = null
+	zone = PackedInt32Array()
 
 static func construire(c: CarteSurface) -> void:
 	var r := PlanMonde.LIMITES
@@ -108,6 +113,10 @@ static func _rond(p: Vector3, r: float) -> void:
 				grille.set_point_solid(Vector2i(x, y), true)
 
 static func est_libre(p: Vector3) -> bool:
+	if grille == null:
+		if caverne != null and caverne.pret:
+			return caverne.praticable(caverne.case_de(p))
+		return true
 	var c := _cellule(p)
 	return _dedans(c) and not grille.is_point_solid(c)
 
@@ -126,6 +135,10 @@ static func _libre_proche(c: Vector2i) -> Vector2i:
 	return Vector2i(-1, -1)
 
 static func point_libre(p: Vector3) -> Vector3:
+	if grille == null:
+		if caverne != null and caverne.pret:
+			return caverne.centre(caverne.libre_pres(p))
+		return p
 	var c := _libre_proche(_cellule(p))
 	return p if c.x < 0 else _centre(c)
 
@@ -152,6 +165,8 @@ static func chemin(a: Vector3, b: Vector3) -> PackedVector3Array:
 static func _chemin(a: Vector3, b: Vector3) -> PackedVector3Array:
 	var res := PackedVector3Array()
 	if grille == null:
+		if caverne != null and caverne.pret:
+			return caverne.chemin(a, b)
 		res.append(b)
 		return res
 	_calculs += 1

@@ -229,7 +229,7 @@ func _process(_d: float) -> void:
 		return
 	_lieux()
 	_t_village -= _d
-	if _lieu_actuel in ["village", "jarnborg", "vik"] and village and _t_village <= 0.0:
+	if _lieu_actuel in ["village", "jarnborg", "vik"] and village and _t_village <= 0.0 and Interieur.actuel == null:
 		_t_village = 2.0
 		hud.regler_titre(CarteSurface.lieu_de(heros.global_position).get("nom", ""), village.texte_heure(), Color("#FFE2A0"))
 	_terres(CarteSurface.TERRES.grow(2.0).has_point(Vector2(heros.global_position.x, heros.global_position.z)))

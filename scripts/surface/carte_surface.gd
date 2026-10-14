@@ -53,6 +53,11 @@ var _colliders: Node3D
 
 var _t_depart := 0
 
+func _exit_tree() -> void:
+	if courante == self:
+		courante = null
+	NavMonde.oublier()
+
 func _ready() -> void:
 	_t_depart = Time.get_ticks_msec()
 	courante = self

@@ -135,6 +135,14 @@ const TYPES := {
 			 "portee_min": 5.0, "portee_max": 10.0, "bond": true, "etourdir": 0.7},
 		],
 	},
+	"huscarl": {
+		"nom": "Huscarl du Jarl", "modele": "chevalier.glb", "arme_d": "res://assets/armes/sword_1handed.gltf", "arme_g": "res://assets/armes/shield_round.gltf",
+		"humain": true, "garde_casque": true, "pv": 1600.0, "vitesse": 3.4, "echelle": 1.15, "portee": 2.2, "garde": 0.0, "armure": true,
+		"attaques": [
+			{"id": "taille", "forme": "cone", "rayon": 2.8, "angle": 0.95, "prep": 0.8, "degats": 210.0,
+			 "anim": "1H_Melee_Attack_Chop", "impact_anim": 0.42, "recup": 0.8, "cd": 1.8, "son": "taille"},
+		],
+	},
 	"skarn": {
 		"nom": "Skarn l'Égorgeur", "modele": "marchand.glb", "arme_d": "res://assets/armes/dagger.gltf", "arme_g": "res://assets/armes/dagger.gltf",
 		"humain": true, "pv": 2300.0, "vitesse": 4.0, "echelle": 1.25, "portee": 2.2, "garde": 0.0, "armure": false, "elite": true,

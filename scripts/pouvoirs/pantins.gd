@@ -41,7 +41,7 @@ func _exit_tree() -> void:
 
 func plein() -> bool:
 	_nettoyer()
-	return liste.size() >= MAX
+	return liste.filter(func(v): return not v.has_meta("serviteur")).size() >= MAX
 
 func ajouter(v: Villageois, force := false) -> bool:
 	_nettoyer()
@@ -63,15 +63,23 @@ func retirer(v: Villageois) -> void:
 	_maj()
 
 static func perdu(v: Villageois) -> void:
+	var cid: String = v.colonie.id if v.colonie else v.get_meta("colonie_id", "")
+	var l: Array = Profil.p().vus.get("pantins", [])
+	Profil.p().vus["pantins"] = l.filter(func(e): return not (e[0] == cid and e[1] == v.nom))
+	if v.has_meta("serviteur"):
+		var ls: Array = Profil.p().vus.get("serviteurs", [])
+		Profil.p().vus["serviteurs"] = ls.filter(func(e): return e["nom"] != v.nom)
+	Profil.p()._marquer()
 	if moi:
 		moi.liste.erase(v)
-		moi._sauver()
 		moi._maj()
 
 func _nettoyer() -> void:
 	liste = liste.filter(func(v): return is_instance_valid(v) and not v.est_mort and v.pantin)
 
 func _sauver() -> void:
+	if Village.moi == null:
+		return   # dans le donjon, la liste ne contient que les compagnons : on ne touche pas au profil
 	var l: Array = []
 	for v in liste:
 		if is_instance_valid(v) and v.colonie:
@@ -89,6 +97,47 @@ func restaurer() -> void:
 			if is_instance_valid(v) and v.colonie and v.colonie.id == e[0] and v.nom == e[1] and not v.pantin:
 				ajouter(v, true)
 				break
+	_maj()
+
+# ---------------- compagnons : les pantins qui te suivent descendent au donjon avec toi ----------------
+
+static var compagnons: Array = []
+
+## Au moment de franchir le Portail : ceux qui te suivent (et sont près de toi) t'accompagnent.
+func emporter() -> void:
+	compagnons.clear()
+	_nettoyer()
+	var h = Jeu.joueur
+	for v in liste:
+		if v.ordre.get("id", "") in ["suivre", "attaquer"] and h and v.global_position.distance_to(h.global_position) < 40.0:
+			compagnons.append({"nom": v.nom, "metier": v.metier, "role": v.role, "modele": v.modele_id, "teinte": v.teinte.to_html(),
+				"pv_max": v.pv_max, "force": v.force, "enfant": v.enfant, "femme": v.femme, "colonie": v.colonie.id if v.colonie else "",
+				"serviteur": v.has_meta("serviteur")})
+	if not compagnons.is_empty():
+		Jeu.notifier("%d compagnon(s) descendent avec toi." % compagnons.size(), Color("#D9B8FF"))
+
+## Dans le donjon : ils apparaissent à côté de toi, et te suivent par les galeries.
+func deployer(parent: Node, h: Node3D, nav: NavCaverne) -> void:
+	NavMonde.caverne = nav
+	for c in compagnons:
+		var v := Villageois.new()
+		v.nom = c["nom"]
+		v.metier = c["metier"]
+		v.role = c["role"]
+		v.modele_id = c["modele"]
+		v.teinte = Color(c["teinte"])
+		v.pv_max = c["pv_max"]
+		v.force = c["force"]
+		v.enfant = c["enfant"]
+		v.femme = c["femme"]
+		v.set_meta("colonie_id", c["colonie"])
+		if c.get("serviteur", false):
+			v.set_meta("serviteur", true)
+		v.position = NavMonde.point_libre(h.global_position + Vector3(randf_range(-2, 2), 0, 2.0))
+		parent.add_child(v)
+		v.devenir_pantin(h)
+		liste.append(v)
+	compagnons.clear()
 	_maj()
 
 # ---------------- dépôts (récoltes des pantins) ----------------
@@ -403,8 +452,9 @@ func ouvrir(v: Villageois) -> void:
 	var p: Control = _ui.neuf(HUD.UI + "rpg/panel_beige.png", 18, Vector2(700, 420), Vector2(290, 70), _panneau)
 	_ui.texte("Ton pantin : " + v.nom, 24, HUD.ENCRE, Vector2(24, 16), p, false)
 	_ui.texte(v.metier + (" · " + v.colonie.nom if v.colonie else "") + "  ·  PV %d / %d" % [int(v.pv), int(v.pv_max)], 13, HUD.ENCRE2, Vector2(24, 50), p, false)
+	var surface := Village.moi != null
 	var ordres := [
-		["Suis-moi", "Il te suit et te défend.", func(): ordonner(v, {"id": "suivre"})],
+		["Suis-moi", "Il te suit et te défend" + (" — et descend au donjon avec toi." if surface else "."), func(): ordonner(v, {"id": "suivre"})],
 		["Coupe du bois", "Abat les arbres d'ici : le bois va dans ton coffre.", func(): ordonner(v, {"id": "bois", "centre": v.global_position})],
 		["Mine la pierre", "Casse les rochers d'ici : la pierre va dans ton coffre.", func(): ordonner(v, {"id": "pierre", "centre": v.global_position})],
 		["Cambriole…", "Choisis une maison, une échoppe, le château…", func(): _choix_vol(v)],
@@ -416,6 +466,8 @@ func ouvrir(v: Villageois) -> void:
 				Pouvoirs.moi.prendre_corps(v)],
 		["Libère-le", "Il redevient lui-même.", func(): retirer(v)],
 	]
+	if not surface:
+		ordres = ordres.filter(func(o): return o[0] in ["Suis-moi", "Attaque…", "Monte la garde", "Libère-le"])
 	var i := 0
 	for o in ordres:
 		var col := i % 2

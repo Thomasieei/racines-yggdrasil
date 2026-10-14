@@ -21,13 +21,25 @@ func nom_maison() -> String:
 		return maison["nom"]
 	return "Maison " + maison.get("famille", "")
 
+func _corps_pris() -> bool:
+	return Pouvoirs.moi != null and Pouvoirs.moi.controle != null
+
 func texte_action() -> String:
-	return "Fouiller"
+	if _corps_pris():
+		return "Fouiller"
+	if Interieur.new_est_a_moi(maison, colonie):
+		return "Entrer chez toi"
+	return "Entrer"
 
 func disponible() -> bool:
-	return Pouvoirs.moi != null and Pouvoirs.moi.controle != null and videe_t <= 0.0
+	if _corps_pris():
+		return videe_t <= 0.0
+	return maison.get("genre", "") in ["maison", "taverne", "forge", "temple", "chateau", "hall"]
 
-func interagir(_h) -> void:
+func interagir(h) -> void:
+	if not _corps_pris():
+		Interieur.entrer(maison, colonie, h)
+		return
 	var v: Villageois = Pouvoirs.moi.controle
 	if v == null or v.global_position.distance_to(global_position) > 3.4:
 		return

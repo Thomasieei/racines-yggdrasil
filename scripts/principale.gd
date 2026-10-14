@@ -54,6 +54,8 @@ func _ready() -> void:
 		_test_chef()
 	if "--test-village" in OS.get_cmdline_user_args():
 		_test_village()
+	if "--test-interieurs" in OS.get_cmdline_user_args():
+		_test_interieurs()
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--perf="):
 			_test_perf(a.substr(7))
@@ -170,6 +172,11 @@ func _construire() -> void:
 		sd.name = "ScenarioDonjon"
 		add_child(sd)
 		sd.demarrer(self, joueur, hud)
+		# les pantins qui te suivaient descendent avec toi
+		var pantins_d := Pantins.new()
+		pantins_d.name = "Pantins"
+		add_child(pantins_d)
+		_deployer_compagnons(sd, pantins_d)
 	if carte == "surface":
 		var pantins := Pantins.new()
 		pantins.name = "Pantins"
@@ -249,6 +256,13 @@ func _apres_la_mort() -> void:
 	await get_tree().create_timer(4.5).timeout
 	changer_carte("surface", true)
 
+func _deployer_compagnons(sd: Node, pantins_d: Pantins) -> void:
+	if Pantins.compagnons.is_empty():
+		return
+	while sd.nav == null or not sd.nav.pret:
+		await get_tree().create_timer(0.3).timeout
+	pantins_d.deployer(self, joueur, sd.nav)
+
 func changer_carte(nom: String, sans_intro := true, garder_sac := true) -> void:
 	if garder_sac and joueur and is_instance_valid(joueur) and not joueur.est_mort:
 		sac_suivant = joueur.sac
@@ -285,6 +299,8 @@ func _physics_process(_d: float) -> void:
 	if carte == "surface" and joueur and not joueur.est_mort and carte_suivante != "crypte_en_cours":
 		if joueur.global_position.distance_to(CarteSurface.PORTAIL + Vector3(0, 0, 1.6)) < 2.6:
 			carte_suivante = "crypte_en_cours"
+			if Pantins.moi:
+				Pantins.moi.emporter()
 			Jeu.evenement("portail")
 			Sons.jouer("activation", joueur.global_position, 0.0, 0.7)
 			changer_carte("crypte")
@@ -750,6 +766,79 @@ func _test_chef() -> void:
 	await _cap("chef_gestion")
 	printerr("TEST grenier=", Hameau.etat()["stock"], " prod=", Hameau.production())
 	get_tree().quit()
+
+func _entrer_porte(genre: String, col_id: String) -> bool:
+	for pt in get_tree().get_nodes_in_group("portes"):
+		if pt.maison["genre"] == genre and pt.colonie.id == col_id:
+			joueur.global_position = pt.global_position + pt.maison["dir"] * 0.5
+			await get_tree().create_timer(0.4).timeout
+			hud._chercher_action()
+			printerr("TEST porte ", genre, " bouton=", hud._action_lab.text)
+			hud._agir()
+			await get_tree().create_timer(1.0).timeout
+			return true
+	return false
+
+func _test_interieurs() -> void:
+	await get_tree().create_timer(1.5).timeout
+	joueur.invulnerable_t = 1e9
+	if carte == "crypte":
+		await get_tree().create_timer(6.0).timeout
+		var n := get_tree().get_nodes_in_group("pantin").size()
+		printerr("TEST donjon : compagnons=", n, " ", get_tree().get_nodes_in_group("pantin").map(func(v): return v.nom + " " + str(int(v.global_position.distance_to(joueur.global_position))) + "m"))
+		joueur.global_position += Vector3(0, 0, -8)
+		await get_tree().create_timer(5.0).timeout
+		printerr("TEST donjon : après marche ", get_tree().get_nodes_in_group("pantin").map(func(v): return str(int(v.global_position.distance_to(joueur.global_position))) + "m"))
+		await _cap("donjon_compagnons")
+		get_tree().quit()
+		return
+	await _entrer_porte("maison", "jarnborg")
+	await _cap("interieur_maison")
+	for o in get_tree().get_nodes_in_group("interactif"):
+		if o is ObjetInterieur and o.genre == "coffre" and o.global_position.distance_to(joueur.global_position) < 20.0:
+			joueur.global_position = o.global_position + Vector3(0, 0, 1.2)
+			var or0: int = joueur.sac.or_
+			o.interagir(joueur)
+			await get_tree().create_timer(2.2).timeout
+			printerr("TEST coffre maison : or ", or0, " -> ", joueur.sac.or_)
+			break
+	Interieur.sortir(joueur)
+	await get_tree().create_timer(0.5).timeout
+	await _entrer_porte("taverne", "jarnborg")
+	await _cap("interieur_taverne")
+	Interieur.sortir(joueur)
+	await _entrer_porte("chateau", "jarnborg")
+	await _cap("interieur_chateau")
+	Interieur.sortir(joueur)
+	# ta maison (chef de Brekka) et un serviteur
+	Hameau.etat()["chef"] = true
+	joueur.sac.ajouter_or(400)
+	var pt0 = null
+	for pt in get_tree().get_nodes_in_group("portes"):
+		if pt.colonie.id == "brekka" and pt.maison == pt.colonie.maisons[0]:
+			pt0 = pt
+	joueur.global_position = pt0.global_position + pt0.maison["dir"] * 0.5
+	await get_tree().create_timer(0.4).timeout
+	hud._chercher_action()
+	printerr("TEST ta maison bouton=", hud._action_lab.text)
+	hud._agir()
+	await get_tree().create_timer(1.0).timeout
+	for o in get_tree().get_nodes_in_group("interactif"):
+		if o is ObjetInterieur and o.genre == "intendant" and o.global_position.distance_to(joueur.global_position) < 20.0:
+			o.interagir(joueur)
+	await get_tree().create_timer(1.0).timeout
+	await _cap("ta_maison")
+	printerr("TEST serviteurs=", Profil.p().vus.get("serviteurs", []).size(), " pantins=", Pantins.moi.liste.map(func(v): return v.nom))
+	Interieur.sortir(joueur)
+	# au Portail avec ceux qui suivent
+	for v in Pantins.moi.liste:
+		Pantins.moi.ordonner(v, {"id": "suivre"})
+		v.global_position = CarteSurface.PORTAIL + Vector3(1, 0, 5)
+	joueur.global_position = CarteSurface.PORTAIL + Vector3(0, 0, 5)
+	await get_tree().create_timer(0.6).timeout
+	Pantins.moi.emporter()
+	printerr("TEST emportés=", Pantins.compagnons.size())
+	changer_carte("crypte")
 
 ## Mesure du temps de script par image à un endroit (moyenne sur 3 s).
 func _mesurer(n := 90) -> float:
