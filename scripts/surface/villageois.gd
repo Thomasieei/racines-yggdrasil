@@ -69,6 +69,26 @@ func _ready() -> void:
 	add_child(_etiquette)
 	_but = global_position
 
+# ---------------- parole (Sigurd, le chef) ----------------
+
+var parle := Callable()
+var rayon_action := 3.2
+var rayon := 3.2
+
+func activer_parole(f: Callable) -> void:
+	parle = f
+	add_to_group("interactif")
+
+func texte_action() -> String:
+	return "Parler"
+
+func disponible() -> bool:
+	return parle.is_valid() and not controle and not cache and (Pouvoirs.moi == null or Pouvoirs.moi.controle == null)
+
+func interagir(h) -> void:
+	if parle.is_valid():
+		parle.call(h)
+
 func jouer(n: String, vit := 1.0) -> void:
 	if anim and anim.has_animation(n) and _anim_courante != n:
 		_anim_courante = n

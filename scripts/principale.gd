@@ -50,6 +50,8 @@ func _ready() -> void:
 	chargement.disparaitre()
 	if carte == "surface" and not extraction.is_empty():
 		_accueil_extraction()
+	if "--test-chef" in OS.get_cmdline_user_args():
+		_test_chef()
 	if "--test-village" in OS.get_cmdline_user_args():
 		_test_village()
 	if "--test-pouvoirs" in OS.get_cmdline_user_args():
@@ -660,6 +662,30 @@ func _test_village() -> void:
 	Pouvoirs.moi.rompre_controle()
 	await get_tree().create_timer(0.5).timeout
 	printerr("TEST or ", or0, " -> ", joueur.sac.or_, " sac=", joueur.sac.objets.map(func(o): return o["nom"]))
+	get_tree().quit()
+
+func _test_chef() -> void:
+	await get_tree().create_timer(1.5).timeout
+	joueur.sac.ajouter(Objets.creer("bois", "commun", 60))
+	joueur.sac.ajouter(Objets.creer("pierre", "commun", 30))
+	joueur.sac.ajouter_or(900)
+	var ui := CanvasLayer.new()
+	ui.set_script(load("res://scripts/interface/hameau_ui.gd"))
+	add_child(ui)
+	ui.ouvrir(joueur)
+	await get_tree().create_timer(0.5).timeout
+	await _cap("chef_offre")
+	Hameau.payer(Hameau.PRIX_CHEF, joueur)
+	Hameau.etat()["chef"] = true
+	for n in ["Brynja", "Ingrun", "Kári", "Bard", "Orm", "Dagny"]:
+		Hameau.etat()["metiers"][n] = ["fermier", "bucheron", "bucheron", "mineur", "mineur", "garde"][["Brynja", "Ingrun", "Kári", "Bard", "Orm", "Dagny"].find(n)]
+	Hameau.etat()["dernier"] = Time.get_unix_time_from_system() - 7200.0
+	Hameau.avancer()
+	Village.moi.reassigner()
+	ui._rafraichir()
+	await get_tree().create_timer(0.5).timeout
+	await _cap("chef_gestion")
+	printerr("TEST grenier=", Hameau.etat()["stock"], " prod=", Hameau.production())
 	get_tree().quit()
 
 func _cap(nom: String) -> void:

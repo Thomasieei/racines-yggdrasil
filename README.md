@@ -48,6 +48,7 @@ Le bébé dragon est le Dragon Evolved de Quaternius (CC0, animé) et l'œuf un 
 - **Déchaînement** (70 mana, touche 8) : longue incantation, puis une explosion qui pulvérise tout dans un rayon de 18 m.
 - **Contrôle d'esprit** (40 mana, touche 9) : prends l'esprit du villageois le plus proche pendant 60 s. Il marche à ta place et peut **fouiller les maisons** du Hameau de Brekka ; si un garde le voit, « Au voleur ! » et il est emmené. Le butin d'un vol réussi rejoint ton sac (or, potions, parfois une relique ou une **Robe de résurrection** : tant qu'elle est dans ton sac, la mort ne te prend pas, une fois).
 - **Hameau de Brekka** (nord-ouest, par un sentier depuis le chemin) : treize habitants en familles, chacun avec son métier et sa journée (travail, repas à la taverne, veillée au feu, nuit à la maison), deux gardes qui font leur ronde.
+- **Devenir chef de Brekka** : parle à Sigurd, apporte 40 bois, 20 pierre et 500 or. Ensuite, donne un métier à chaque habitant (bûcheron, mineur, fermier, garde) : ils produisent pour toi en continu, même jeu fermé (8 h au plus). Améliore scierie, carrière, moulin et palissade (+50 % par niveau), puis vide le grenier : l'or dans ton sac, le reste dans ton coffre.
 - **Terres Gâtées** (au sud-est du Bourg, par la porte sud) : la Horde, des centaines de rampants qui déferlent sans fin. Chaque rampant pulvérisé rend un peu de mana : on enchaîne les Déchaînements.
 
 ## Commandes

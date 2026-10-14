@@ -63,6 +63,12 @@ func demarrer(p: Node) -> void:
 		v.position = v.travail + Vector3(randf_range(-3, 3), 0, randf_range(-3, 3))
 		p.add_child(v)
 		habitants.append(v)
+		if r[0] == "Sigurd":
+			v.activer_parole(func(h):
+				var ui := CanvasLayer.new()
+				ui.set_script(load("res://scripts/interface/hameau_ui.gd"))
+				p.add_child(ui)
+				ui.ouvrir(h))
 	for i in 2:
 		var g := Villageois.new()
 		g.nom = ["Hjalmar", "Sölvi"][i]
@@ -80,7 +86,31 @@ func demarrer(p: Node) -> void:
 		porte.position = _porte(i)
 		p.add_child(porte)
 		portes.append(porte)
+	reassigner()
+	Hameau.avancer()
+	_annoncer_grenier()
+
+## Les métiers choisis par le chef décident où chacun travaille.
+func reassigner() -> void:
+	for i in RESIDENTS.size():
+		var r: Array = RESIDENTS[i]
+		var v: Villageois = habitants[i]
+		var m := Hameau.metier_de(r[0])
+		v.travail = POSTES[Hameau.METIERS[m]["poste"]] if m != "" else POSTES[r[3]]
+		if m != "":
+			v.metier = Hameau.METIERS[m]["nom"] + " (pour toi)"
+		v._etiquette.text = v.nom + "\n" + v.metier
 	_appliquer_heure(true)
+
+func _annoncer_grenier() -> void:
+	if not Hameau.est_chef():
+		return
+	await get_tree().create_timer(5.0).timeout
+	var e := Hameau.etat()
+	var o := int(e["stock"].get("or", 0.0))
+	var b := int(e["stock"].get("bois", 0.0))
+	if o + b > 0:
+		Jeu.notifier("Brekka a produit pour toi : %d or, %d bois… Va voir Sigurd." % [o, b], Color("#FFE2A0"))
 
 ## Devant la porte d'une maison (côté place).
 func _porte(i: int) -> Vector3:

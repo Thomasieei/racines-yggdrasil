@@ -177,7 +177,7 @@ func _haut_gauche() -> void:
 	racine.add_child(_mana_plein)
 	_mana_texte = texte("", 11, Color("#F3E6FF"), pm + Vector2(0, 0), null, true, LARG_MANA, HORIZONTAL_ALIGNMENT_CENTER)
 	var cl: Dictionary = Classes.fiche(Profil.p().classe)
-	texte("Thomas · " + cl["titre"], 15, cl["couleur"].lerp(OR, 0.3), Vector2(102, 68))
+	texte("Thomas · " + cl["titre"] + (" · Chef de Brekka" if Hameau.est_chef() else ""), 15, cl["couleur"].lerp(OR, 0.3), Vector2(102, 68))
 
 func _fond_barre(pos: Vector2, taille: Vector2, c: Color) -> void:
 	var fond := Panel.new()
