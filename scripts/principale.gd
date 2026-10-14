@@ -50,6 +50,8 @@ func _ready() -> void:
 	chargement.disparaitre()
 	if carte == "surface" and not extraction.is_empty():
 		_accueil_extraction()
+	if "--test-village" in OS.get_cmdline_user_args():
+		_test_village()
 	if "--test-pouvoirs" in OS.get_cmdline_user_args():
 		_test_pouvoirs()
 	if "--test-boucle" in OS.get_cmdline_user_args():
@@ -629,6 +631,35 @@ func _test_pouvoirs() -> void:
 	await get_tree().create_timer(1.6).timeout
 	await _cap("lames_fin")
 	printerr("TEST sac=", joueur.sac.objets.map(func(o): return o["nom"] + "x" + str(o["qte"])))
+	get_tree().quit()
+
+func _test_village() -> void:
+	await get_tree().create_timer(1.5).timeout
+	joueur.invulnerable_t = 1e9
+	joueur.mana = 100.0
+	joueur.global_position = Vector3(53, 0.1, 26)
+	await get_tree().create_timer(3.0).timeout
+	await _cap("village")
+	printerr("TEST habitants=", Village.moi.habitants.size(), " heure=", Village.moi.texte_heure())
+	Pouvoirs.moi.lancer("esprit")
+	await get_tree().create_timer(2.0).timeout
+	var v: Villageois = Pouvoirs.moi.controle
+	printerr("TEST contrôle=", v.nom if v else "aucun")
+	await _cap("esprit")
+	for g in Village.moi.gardes:
+		g.global_position = Vector3(90, 0, 60)
+		g.activite("loin", Vector3(90, 0, 60))
+	var porte: PorteMaison = Village.moi.portes[1]
+	v.global_position = porte.global_position + Vector3(0.5, 0, 0.8)
+	await get_tree().create_timer(0.5).timeout
+	await _cap("porte")
+	porte.interagir(joueur)
+	await get_tree().create_timer(3.6).timeout
+	await _cap("vol")
+	var or0 := joueur.sac.or_
+	Pouvoirs.moi.rompre_controle()
+	await get_tree().create_timer(0.5).timeout
+	printerr("TEST or ", or0, " -> ", joueur.sac.or_, " sac=", joueur.sac.objets.map(func(o): return o["nom"]))
 	get_tree().quit()
 
 func _cap(nom: String) -> void:

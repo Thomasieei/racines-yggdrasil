@@ -148,3 +148,14 @@ P["pouvoir_dechainement"] = rayons + forme("M64 34 A30 30 0 1 1 63.9 34 Z", "url
 for k, v in P.items():
     open(os.path.join(RACINE, "icones_sorts", k + ".svg"), "w").write(svg2(v))
 print(len(P), "pouvoirs")
+
+# ---- contrôle d'esprit, robe de résurrection ----
+Q = {}
+Q["pouvoir_esprit"] = forme("M64 14 Q100 14 104 50 Q106 74 86 84 L86 104 L42 104 L42 84 Q22 74 24 50 Q28 14 64 14 Z", "url(#rune)") + \
+    trait("M48 50 Q64 36 80 50 Q64 64 48 50 Z", "#F8E8FF", 4) + forme("M64 46 A5 5 0 1 1 63.9 46 Z", "#2A0E4A", 2) + \
+    trait("M64 4 L64 12 M28 18 L34 24 M100 18 L94 24", "url(#rune)", 4)
+Q["robe"] = forme("M46 14 L82 14 L92 34 L84 40 L92 112 L36 112 L44 40 L36 34 Z", "#F6EFD8") + \
+    trait("M46 14 Q64 30 82 14 M64 26 L64 112", "url(#or)", 4) + forme("M64 60 L72 70 L64 80 L56 70 Z", "url(#or)", 3)
+for k, v in Q.items():
+    open(os.path.join(RACINE, "icones_sorts", k + ".svg"), "w").write(svg2(v))
+print(len(Q), "icônes esprit")

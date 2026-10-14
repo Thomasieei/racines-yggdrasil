@@ -208,16 +208,16 @@ func _sur_mana(m: float, m_max: float) -> void:
 
 ## Les trois pouvoirs du monde, en colonne à droite (au-dessus de la roue des sorts).
 func construire_pouvoirs() -> void:
-	var y := 214.0
-	for id in ["tp", "lames", "dechainement"]:
-		var b := _rond(Vector2(1238, y), 58, Pouvoirs.LISTE[id]["icone"])
+	var y := 200.0
+	for id in ["tp", "lames", "esprit", "dechainement"]:
+		var b := _rond(Vector2(1244, y), 52, Pouvoirs.LISTE[id]["icone"])
 		var lab := texte("%d" % int(Pouvoirs.LISTE[id]["mana"]), 11, Color("#E6D2FF"), Vector2(36, 40), b, true)
 		b.gui_input.connect(func(ev):
 			if (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) or (ev is InputEventScreenTouch and ev.pressed):
 				if Pouvoirs.moi and not Jeu.interface_bloquante:
 					Pouvoirs.moi.lancer(id))
 		_boutons_pouvoir[id] = b
-		y += 64.0
+		y += 58.0
 
 func _sur_energie(e: float, e_max: float) -> void:
 	_energie_plein.size.x = maxf(16.0, LARG_ENERGIE * clampf(e / e_max, 0.0, 1.0))
@@ -461,6 +461,8 @@ func _input(event: InputEvent) -> void:
 			Pouvoirs.moi.ouvrir_carte()
 		elif event.keycode == KEY_7 and Pouvoirs.moi:
 			Pouvoirs.moi.lancer("lames")
+		elif event.keycode == KEY_9 and Pouvoirs.moi:
+			Pouvoirs.moi.lancer("esprit")
 		elif event.keycode == KEY_8 and Pouvoirs.moi:
 			Pouvoirs.moi.lancer("dechainement")
 		elif event.keycode == KEY_E:
@@ -473,7 +475,8 @@ func _chercher_action() -> void:
 	for o in get_tree().get_nodes_in_group("interactif"):
 		if not o.disponible():
 			continue
-		var l: float = Vector2(o.global_position.x - heros.global_position.x, o.global_position.z - heros.global_position.z).length()
+		var acteur: Node3D = Pouvoirs.moi.controle if Pouvoirs.moi and Pouvoirs.moi.controle else heros
+		var l: float = Vector2(o.global_position.x - acteur.global_position.x, o.global_position.z - acteur.global_position.z).length()
 		var portee: float = o.get("rayon_action") if o.get("rayon_action") != null else o.rayon
 		if l < portee and l < d:
 			d = l

@@ -34,6 +34,8 @@ const LISTE := [
 	{"id": "coffre_15", "cat": "Trésors", "nom": "Pilleur de tombes", "texte": "Ouvrir 30 coffres.", "compteur": "coffres", "but": 30, "pts": 2},
 	{"id": "relique_1", "cat": "Trésors", "nom": "Porteur de relique", "texte": "Trouver une relique.", "compteur": "reliques", "but": 1, "pts": 1},
 	{"id": "relique_6", "cat": "Trésors", "nom": "Collier complet", "texte": "Porter 6 reliques à la fois.", "compteur": "reliques_portees", "but": 6, "pts": 3},
+	{"id": "vol_1", "cat": "Trésors", "nom": "Main invisible", "texte": "Faire voler une maison par un villageois sous ton contrôle.", "compteur": "vols", "but": 1, "pts": 2},
+	{"id": "vol_10", "cat": "Trésors", "nom": "Maître des marionnettes", "texte": "Réussir 10 vols par contrôle d'esprit.", "compteur": "vols", "but": 10, "pts": 3},
 	{"id": "eclosion", "cat": "Trésors", "nom": "Premier battement d'ailes", "texte": "Faire éclore un œuf de dragon.", "compteur": "eclosions", "but": 1, "pts": 2},
 	{"id": "riche", "cat": "Trésors", "nom": "Bourse pleine", "texte": "Avoir 5 000 or sur soi.", "compteur": "or_max", "but": 5000, "pts": 2},
 	# Métier

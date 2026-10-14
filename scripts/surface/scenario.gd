@@ -36,6 +36,11 @@ func demarrer(p: Node, h: Heros, hd: CanvasLayer, sans_intro := false) -> void:
 	essaim = Essaim.new()
 	essaim.name = "Horde"
 	p.add_child.call_deferred(essaim)
+	village = Village.new()
+	village.name = "Hameau"
+	p.add_child.call_deferred(village)
+	village.demarrer.call_deferred(p)
+	_annoncer_pouvoirs()
 	if "--depart=bourg" in OS.get_cmdline_user_args():
 		# reprise de tournage : le joueur arrive à la porte du Bourg après le combat du chemin
 		etape = 3
@@ -176,6 +181,8 @@ func _intro() -> void:
 	_quete_bourg()
 
 var essaim: Essaim
+var village: Village
+var _t_village := 0.0
 var _dans_terres := false
 
 func _terres(dans: bool) -> void:
@@ -201,6 +208,10 @@ func _process(_d: float) -> void:
 	if heros == null or not is_instance_valid(heros):
 		return
 	_lieux()
+	_t_village -= _d
+	if _lieu_actuel == "village" and village and _t_village <= 0.0:
+		_t_village = 2.0
+		hud.regler_titre("Hameau de Brekka", village.texte_heure(), Color("#FFE2A0"))
 	_terres(CarteSurface.TERRES.grow(2.0).has_point(Vector2(heros.global_position.x, heros.global_position.z)))
 	# le Portail se montre : la caméra s'ouvre vers lui quand on approche
 	var cam := get_viewport().get_camera_3d()
@@ -289,6 +300,11 @@ func _lieux() -> void:
 	match id:
 		"terres":
 			hud.regler_titre("Terres Gâtées", "La Horde ne s'arrête jamais", Color("#FF9C8A"))
+		"village":
+			if not Profil.p().vu("village_vu"):
+				Profil.p().marquer_vu("village_vu")
+				recit.bandeau("Hameau de Brekka", "Treize habitants, deux gardes, et des maisons pleines…", Color("#FFE2A0"))
+			hud.regler_titre("Hameau de Brekka", village.texte_heure() if village else "", Color("#FFE2A0"))
 		"bourg":
 			recit.bandeau("Bourg de Skjold", "Zone sûre — les armes restent au fourreau", Color("#9DFFC8"))
 			hud.regler_titre("Bourg de Skjold", "Zone sûre", Color("#9DFFC8"))
@@ -305,3 +321,15 @@ func _lieux() -> void:
 				_bandeaux_vus["bois"] = true
 				recit.bandeau("Bois des Murmures", "Zone hostile", Color("#FF9C8A"))
 			hud.regler_titre("Le Val des Racines", "Bois des Murmures · zone hostile", Color("#FF9C8A"))
+
+
+## Une seule fois : Freya annonce l'éveil du mana et des pouvoirs du monde.
+func _annoncer_pouvoirs() -> void:
+	if Profil.p().vu("tuto_pouvoirs"):
+		return
+	await get_tree().create_timer(6.0).timeout
+	if Profil.p().vu("tuto_pouvoirs") or not is_inside_tree():
+		return
+	Profil.p().marquer_vu("tuto_pouvoirs")
+	recit.voix("Freya", "Le mana coule en toi. Regarde à droite : tes pouvoirs t'attendent. La minicarte ouvre le monde entier.", 6.0)
+	Jeu.notifier("Pouvoirs : téléportation, moisson, contrôle d'esprit, déchaînement.", Color("#D9B8FF"), "res://assets/icones_sorts/pouvoir_dechainement.svg")

@@ -35,6 +35,7 @@ const MODELES := {
 	"oeuf": {"nom": "Œuf de dragon", "type": "oeuf", "valeur": 80},
 	"dragon": {"nom": "Bébé dragon", "type": "dragon", "valeur": 60},
 	"relique": {"nom": "Relique", "type": "relique", "valeur": 120},
+	"robe_resurrection": {"nom": "Robe de résurrection", "type": "ressource", "icone": "res://assets/icones_sorts/robe.svg", "valeur": 30},
 	"fragment": {"nom": "Fragment de rune draconique", "type": "rune", "icone": "res://assets/icones_sorts/fragment.svg", "valeur": 0},
 	"oeuf_runique": {"nom": "Œuf runique", "type": "oeuf_runique", "icone": "res://assets/icones_sorts/oeuf_runique.svg", "valeur": 0},
 }

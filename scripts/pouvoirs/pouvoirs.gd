@@ -11,6 +11,8 @@ const LISTE := {
 		"fiche": "Ouvre la grande carte : touche un endroit, ton héros incante et y apparaît."},
 	"lames": {"nom": "Lames de moisson", "mana": 35.0, "canal": 1.2, "icone": "res://assets/icones_sorts/pouvoir_lames.svg",
 		"fiche": "Des scies runiques jaillissent et rasent tous les arbres, rochers et filons proches."},
+	"esprit": {"nom": "Contrôle d'esprit", "mana": 40.0, "canal": 1.2, "icone": "res://assets/icones_sorts/pouvoir_esprit.svg",
+		"fiche": "Prends l'esprit du villageois le plus proche pendant 60 s : il marche à ta place, et peut fouiller les maisons."},
 	"dechainement": {"nom": "Déchaînement", "mana": 70.0, "canal": 2.6, "icone": "res://assets/icones_sorts/pouvoir_dechainement.svg",
 		"fiche": "Longue incantation, puis une explosion qui pulvérise tout dans un rayon de 18 m."},
 }
@@ -53,6 +55,8 @@ func lancer(id: String) -> void:
 			_lames()
 		"dechainement":
 			_dechainement()
+		"esprit":
+			_esprit()
 
 func ouvrir_carte() -> void:
 	var c := CanvasLayer.new()
@@ -275,6 +279,114 @@ func _recolter(c: Dictionary) -> void:
 		if not fusion:
 			_moisson["objets"].append(g)
 	_moisson["xp"] += 4
+
+# ---------------- contrôle d'esprit ----------------
+
+const DUREE_ESPRIT := 60.0
+var controle: Villageois = null
+var butin_vol: Array = []
+var _esprit_t := 0.0
+var _ui_esprit: CanvasLayer
+var _lab_esprit: Label
+
+func _esprit() -> void:
+	var cible: Villageois = null
+	var dmin := 30.0
+	for v in get_tree().get_nodes_in_group("villageois"):
+		if v.cache or v.arrete or v.metier == "Garde du hameau":
+			continue
+		var d: float = v.global_position.distance_to(h.global_position)
+		if d < dmin:
+			dmin = d
+			cible = v
+	if cible == null:
+		Jeu.notifier("Aucun esprit à prendre à moins de 30 m", Color("#CFD6EE"))
+		return
+	if not await _incanter("esprit", Color(0.75, 0.45, 1.0)):
+		return
+	if not is_instance_valid(cible):
+		return
+	controle = cible
+	butin_vol = []
+	_esprit_t = DUREE_ESPRIT
+	cible.prendre_controle()
+	Effets.onde(h.get_parent(), cible.global_position, 3.0, Color(0.75, 0.45, 1.0))
+	Sons.jouer("verre_lourd", cible.global_position, 0.0, 0.7)
+	h.set_physics_process(false)
+	h.jouer("Spellcast_Raise", 0.2, 0.3, 999.0)
+	var cam := get_viewport().get_camera_3d()
+	if cam:
+		cam.set("cible", cible)
+	Jeu.notifier("Tu es dans la tête de %s. Fouille une maison… sans te faire voir des gardes." % cible.nom, Color("#D9B8FF"))
+	_montrer_ui_esprit()
+
+func _montrer_ui_esprit() -> void:
+	_ui_esprit = CanvasLayer.new()
+	_ui_esprit.layer = 6
+	add_child(_ui_esprit)
+	var hud_script = load("res://scripts/interface/hud.gd")
+	var fond := Panel.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.12, 0.05, 0.18, 0.85)
+	sb.border_color = Color(0.75, 0.45, 1.0, 0.9)
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(10)
+	fond.add_theme_stylebox_override("panel", sb)
+	fond.position = Vector2(460, 74)
+	fond.size = Vector2(360, 44)
+	_ui_esprit.add_child(fond)
+	_lab_esprit = Label.new()
+	_lab_esprit.position = Vector2(14, 10)
+	_lab_esprit.size = Vector2(240, 24)
+	_lab_esprit.add_theme_font_size_override("font_size", 15)
+	_lab_esprit.add_theme_color_override("font_color", Color("#EBD8FF"))
+	fond.add_child(_lab_esprit)
+	var b := Button.new()
+	b.text = "Rompre"
+	b.position = Vector2(266, 7)
+	b.size = Vector2(84, 30)
+	b.pressed.connect(rompre_controle)
+	fond.add_child(b)
+
+func _process(delta: float) -> void:
+	if controle == null:
+		return
+	if not is_instance_valid(controle) or h.est_mort:
+		rompre_controle()
+		return
+	_esprit_t -= delta
+	var clavier := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+	controle.entree = h.entree + clavier
+	if _lab_esprit:
+		_lab_esprit.text = "Esprit de %s · %d s%s" % [controle.nom, int(_esprit_t), "  · butin !" if not butin_vol.is_empty() else ""]
+	if _esprit_t <= 0.0:
+		rompre_controle()
+
+func rompre_controle() -> void:
+	if controle == null:
+		return
+	var v := controle
+	controle = null
+	if is_instance_valid(v):
+		var pris: bool = v.arrete
+		v.liberer()
+		if pris:
+			butin_vol.clear()
+	h.set_physics_process(true)
+	h.jouer("Idle", 0.2)
+	h.verrou_anim = 0.0
+	var cam := get_viewport().get_camera_3d()
+	if cam:
+		cam.set("cible", h)
+	if is_instance_valid(_ui_esprit):
+		_ui_esprit.queue_free()
+	Sons.jouer("verre_leger", h.global_position, 0.0, 0.8)
+	# le butin du vol rejoint ton sac
+	var total := 0
+	for b in butin_vol:
+		h.ramasser(b, "un vol bien mené")
+		total += 1
+	butin_vol.clear()
 
 # ---------------- déchaînement ----------------
 

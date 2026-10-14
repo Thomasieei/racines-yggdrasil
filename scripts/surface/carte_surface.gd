@@ -24,6 +24,16 @@ const BOURG := Rect2(104, 16, 46, 42)
 const PLACE := Vector3(127, 0, 37)
 const PORTAIL := Vector3(127, 0, -5)
 const PORTE_BOURG := Vector3(104, 0, 48)
+## Hameau de Brekka : village de travailleurs au nord-ouest, relié au chemin par un sentier.
+const VILLAGE := Rect2(28, -10, 50, 42)
+const PLACE_VILLAGE := Vector3(53, 0, 12)
+const ROUTE_VILLAGE := [Vector2(66, 64), Vector2(60, 46), Vector2(55, 30)]
+## Maisons : [modèle, position, rotation, nom de famille]. Les portes regardent la place.
+const MAISONS := [
+	["building_home_A_blue", Vector3(40, 0, 2), 35.0, "Brekka"], ["building_home_B_blue", Vector3(66, 0, 2), -35.0, "Hallsdóttir"],
+	["building_home_A_blue", Vector3(36, 0, 20), 75.0, "Ulfsson"], ["building_home_B_blue", Vector3(70, 0, 20), -75.0, "Dagny"],
+	["building_tavern_blue", Vector3(53, 0, -4), 0.0, "Taverne du Hareng"],
+]
 ## Terres Gâtées : au sud-est du Bourg, une lande morte où la Horde se lève sans fin.
 const TERRES := Rect2(134, 76, 34, 48)
 const ROUTE_TERRES := [Vector2(127.5, 57), Vector2(129, 66), Vector2(139, 78)]
@@ -34,6 +44,7 @@ const LIEUX := [
 	{"id": "clairiere", "nom": "Clairière des Tertres", "centre": Vector3(62, 0, 69), "rayon": 13.0},
 	{"id": "bourg", "nom": "Bourg de Skjold", "centre": Vector3(127, 0, 37), "rayon": 27.0, "sur": true},
 	{"id": "portail", "nom": "Portail d'Yggdrasil", "centre": Vector3(127, 0, 0), "rayon": 13.0},
+	{"id": "village", "nom": "Hameau de Brekka", "centre": Vector3(53, 0, 10), "rayon": 24.0},
 	{"id": "terres", "nom": "Terres Gâtées", "centre": Vector3(151, 0, 100), "rayon": 24.0},
 	{"id": "bois", "nom": "Bois des Murmures", "centre": Vector3(80, 0, 70), "rayon": 999.0},
 ]
@@ -78,6 +89,7 @@ func _ready() -> void:
 	_foret()
 	_herbes()
 	_terres_gatees()
+	_village()
 
 # =================== briques ===================
 
@@ -226,6 +238,53 @@ func _multimesh_lot(m: Array, transforms: Array, ombres: bool) -> MultiMesh:
 	return mm
 
 # =================== Terres Gâtées ===================
+
+static func _dist_ligne(p: Vector2, pts: Array) -> float:
+	var m := 1e9
+	for i in pts.size() - 1:
+		var a: Vector2 = pts[i]
+		var b: Vector2 = pts[i + 1]
+		var ab := b - a
+		var t := clampf((p - a).dot(ab) / ab.length_squared(), 0.0, 1.0)
+		m = minf(m, p.distance_to(a + ab * t))
+	return m
+
+# =================== Hameau de Brekka ===================
+
+func _village() -> void:
+	var B := H + "buildings/blue/"
+	var N := H + "buildings/neutral/"
+	var P := H + "decoration/props/"
+	for m in MAISONS:
+		poser(B + m[0] + ".gltf", m[1], m[2], 6.2 if m[0].contains("tavern") else 6.4, "boite")
+	# moulin, scierie, champs de blé, puits : chacun a son travail
+	poser(B + "building_windmill_blue.gltf", Vector3(31, 0, 6), 20.0, 6.0, "boite")
+	poser(B + "building_lumbermill_blue.gltf", Vector3(75, 0, 8), -60.0, 6.0, "boite")
+	poser(B + "building_well_blue.gltf", PLACE_VILLAGE + Vector3(0, 0, -1.5), 0.0, 4.2, "boite")
+	for c in [Vector3(30, 0, 27), Vector3(37, 0, 30), Vector3(30, 0, 34)]:
+		poser(N + "building_grain.gltf", c, 0.0, 5.0)
+	poser(R + "Wood_Log_Stack.gltf", Vector3(71, 0, 13), 30.0, 1.6, "boite")
+	poser(R + "Wood_Log_Stack.gltf", Vector3(73.5, 0, 15), 80.0, 1.4, "boite")
+	poser(P + "crate_A_big.gltf", Vector3(57, 0, 2.5), 20.0, 6.0, "boite")
+	poser(P + "sack.gltf", Vector3(48.5, 0, 2.0), 0.0, 6.0, "boite")
+	poser(P + "wheelbarrow.gltf", Vector3(33.5, 0, 24.0), 40.0, 6.0, "boite")
+	poser(N + "building_scaffolding.gltf", Vector3(62, 0, 28), 0.0, 5.5, "boite")
+	_feu_de_camp(PLACE_VILLAGE + Vector3(0, 0, 6))
+	for a in [0.4, 2.0, 3.6, 5.1]:
+		var p := PLACE_VILLAGE + Vector3(0, 0, 6) + Vector3(cos(a), 0, sin(a)) * 3.6
+		poser(HW + "bench.gltf", p, rad_to_deg(-a) + 90.0, 0.9, "boite")
+	# sentier vers le chemin principal
+	for i in ROUTE_VILLAGE.size() - 1:
+		var a: Vector2 = ROUTE_VILLAGE[i]
+		var b: Vector2 = ROUTE_VILLAGE[i + 1]
+		var n := int(a.distance_to(b) / 2.6)
+		for k in n + 1:
+			var q := a.lerp(b, float(k) / maxf(n, 1))
+			poser(HW + "floor_dirt_small.gltf", Vector3(q.x, 0.02, q.y), _rng.randf_range(0, 360), 1.5)
+	for p in [PLACE_VILLAGE + Vector3(-7, 0, 9), PLACE_VILLAGE + Vector3(7, 0, 9), Vector3(57, 0, 32)]:
+		poser(HW + "post_lantern.gltf", p, 0.0, 1.0, "tronc")
+		lumiere(p + Vector3(0, 3.1, 0.6), Color(1.0, 0.78, 0.45), 1.3, 9.0)
+	lumiere(PLACE_VILLAGE + Vector3(0, 6, 0), Color(1.0, 0.85, 0.6), 1.2, 24.0)
 
 static func _dist_route(p: Vector2) -> float:
 	var m := 1e9
@@ -712,6 +771,8 @@ func _libre(p: Vector2, marge := 0.0) -> bool:
 		return false
 	if TERRES.grow(5.0 + marge).has_point(p) or _dist_route(p) < 5.0 + marge:
 		return false
+	if VILLAGE.grow(4.0 + marge).has_point(p) or _dist_ligne(p, ROUTE_VILLAGE) < 5.0 + marge:
+		return false
 	for z in [[SANCTUAIRE, 13.0], [CLAIRIERE, 14.0], [PORTAIL + Vector3(0, 0, 3), 17.0]]:
 		if p.distance_to(Vector2(z[0].x, z[0].z)) < z[1] + marge:
 			return false
@@ -769,6 +830,8 @@ func _herbes() -> void:
 		if p.distance_to(Vector2(PORTAIL.x, PORTAIL.z + 4.0)) < 12.0:
 			continue
 		if TERRES.grow(3.0).has_point(p) or _dist_route(p) < 3.0:
+			continue
+		if _dist_ligne(p, ROUTE_VILLAGE) < 3.0 or (VILLAGE.has_point(p) and p.distance_to(Vector2(PLACE_VILLAGE.x, PLACE_VILLAGE.z)) < 12.0):
 			continue
 		var base := Transform3D(Basis(Vector3.UP, _rng.randf_range(0, TAU)), Vector3(p.x, 0, p.y))
 		var r := _rng.randf()

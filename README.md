@@ -46,6 +46,8 @@ Le bébé dragon est le Dragon Evolved de Quaternius (CC0, animé) et l'œuf un 
 - **Téléportation** (30 mana) : touche la minicarte (ou M) pour ouvrir la grande carte, touche un endroit : ton héros incante puis y apparaît. « Y aller à pied » marque la destination.
 - **Lames de moisson** (35 mana, touche 7) : des scies runiques rasent jusqu'à 9 arbres, rochers ou filons autour de toi ; bois, pierre, minerais et expérience de Mineur d'un coup. Les arbres repoussent.
 - **Déchaînement** (70 mana, touche 8) : longue incantation, puis une explosion qui pulvérise tout dans un rayon de 18 m.
+- **Contrôle d'esprit** (40 mana, touche 9) : prends l'esprit du villageois le plus proche pendant 60 s. Il marche à ta place et peut **fouiller les maisons** du Hameau de Brekka ; si un garde le voit, « Au voleur ! » et il est emmené. Le butin d'un vol réussi rejoint ton sac (or, potions, parfois une relique ou une **Robe de résurrection** : tant qu'elle est dans ton sac, la mort ne te prend pas, une fois).
+- **Hameau de Brekka** (nord-ouest, par un sentier depuis le chemin) : treize habitants en familles, chacun avec son métier et sa journée (travail, repas à la taverne, veillée au feu, nuit à la maison), deux gardes qui font leur ronde.
 - **Terres Gâtées** (au sud-est du Bourg, par la porte sud) : la Horde, des centaines de rampants qui déferlent sans fin. Chaque rampant pulvérisé rend un peu de mana : on enchaîne les Déchaînements.
 
 ## Commandes

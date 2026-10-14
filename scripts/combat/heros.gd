@@ -729,6 +729,20 @@ func _reaction_coup(d: Dictionary) -> void:
 		jouer("Hit_A", 0.05, 1.6, 0.22)
 
 func _mourir() -> void:
+	# Robe de résurrection : tant qu'elle est dans le sac, la mort ne prend pas (une fois)
+	if not ia and sac.compter("robe_resurrection") > 0:
+		for o in sac.objets:
+			if o["id"] == "robe_resurrection":
+				sac.retirer(o, 1)
+				break
+		pv = pv_max * 0.5
+		pv_change.emit(pv, pv_max)
+		invulnerable_t = 2.5
+		Effets.onde(_scene(), global_position, 4.0, Color(1.0, 0.9, 0.5))
+		Effets.etincelles(_scene(), global_position + Vector3(0, 1, 0), Vector3.UP, Color(1.0, 0.9, 0.5), 40, 6.0, "star_06.png", 0.45)
+		Sons.jouer("cloche", global_position, 2.0, 0.8)
+		Jeu.notifier("La Robe de résurrection se consume : tu te relèves !", Color("#FFE9A0"))
+		return
 	tueur = dernier_agresseur if is_instance_valid(dernier_agresseur) else null
 	super._mourir()
 	cacher_visee()
